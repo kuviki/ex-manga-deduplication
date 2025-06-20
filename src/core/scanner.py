@@ -6,6 +6,8 @@
 
 import os
 import time
+import numpy as np
+import imagehash
 from typing import List, Dict, Set, Tuple, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -290,56 +292,123 @@ class Scanner(QObject):
             )
     
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
-        """检测重复漫画"""
+        """检测重复漫画 - 使用numpy优化的高性能实现"""
         duplicate_groups = []
         processed_comics = set()
         
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
         
-        for i, comic1 in enumerate(comic_infos):
-            if comic1.path in processed_comics or comic1.error:
+        # 过滤有效的漫画
+        valid_comics = [comic for comic in comic_infos if not comic.error and comic.image_hashes]
+        if len(valid_comics) < 2:
+            return duplicate_groups
+        
+        logger.info(f"开始使用numpy优化算法检测 {len(valid_comics)} 个漫画的重复")
+        
+        # 构建全局哈希数组和索引映射
+        all_hashes = []
+        hash_to_comic_idx = []
+        comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
+        
+        current_idx = 0
+        for comic_idx, comic in enumerate(valid_comics):
+            start_idx = current_idx
+            for hash_str in comic.image_hashes.values():
+                try:
+                    # 将哈希字符串转换为numpy数组
+                    hash_obj = imagehash.hex_to_hash(hash_str)
+                    hash_array = np.array(hash_obj.hash, dtype=np.uint8)
+                    all_hashes.append(hash_array.flatten())
+                    hash_to_comic_idx.append(comic_idx)
+                    current_idx += 1
+                except Exception as e:
+                    logger.warning(f"解析哈希失败: {hash_str}, 错误: {e}")
+                    continue
+            
+            end_idx = current_idx
+            if end_idx > start_idx:
+                comic_hash_ranges[comic_idx] = (start_idx, end_idx)
+        
+        if not all_hashes:
+            logger.warning("没有有效的图片哈希")
+            return duplicate_groups
+        
+        # 转换为numpy矩阵
+        all_hashes_matrix = np.array(all_hashes, dtype=np.uint8)  # shape: (total_images, hash_bits)
+        hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
+        
+        logger.info(f"构建了 {all_hashes_matrix.shape[0]} x {all_hashes_matrix.shape[1]} 的哈希矩阵")
+        
+        # 对每个漫画进行重复检测
+        for comic_idx, comic in enumerate(valid_comics):
+            if comic.path in processed_comics:
                 continue
             
-            similar_comics = [comic1]
-            all_similar_images = []
+            if comic_idx not in comic_hash_ranges:
+                continue
             
-            for j, comic2 in enumerate(comic_infos[i+1:], i+1):
-                if comic2.path in processed_comics or comic2.error:
-                    continue
-                
-                # 比较两个漫画的相似图片
-                similar_images = self._compare_comics(comic1, comic2, similarity_threshold)
-                
-                if len(similar_images) >= min_similar_images:
-                    similar_comics.append(comic2)
-                    all_similar_images.extend(similar_images)
+            start_idx, end_idx = comic_hash_ranges[comic_idx]
+            comic_hashes = all_hashes_matrix[start_idx:end_idx]  # 当前漫画的哈希矩阵
             
-            # 如果找到重复漫画
-            if len(similar_comics) > 1:
-                duplicate_group = DuplicateGroup(
-                    comics=similar_comics,
-                    similar_images=all_similar_images,
-                    similarity_count=len(all_similar_images)
-                )
-                duplicate_groups.append(duplicate_group)
+            # 计算当前漫画与所有图片的汉明距离矩阵
+            # 使用广播计算: (comic_images, 1, hash_bits) XOR (1, all_images, hash_bits)
+            comic_hashes_expanded = comic_hashes[:, np.newaxis, :]
+            all_hashes_expanded = all_hashes_matrix[np.newaxis, :, :]
+            
+            # 计算XOR并求和得到汉明距离
+            xor_result = comic_hashes_expanded ^ all_hashes_expanded
+            hamming_distances = np.sum(xor_result, axis=2)  # shape: (comic_images, all_images)
+            
+            # 应用相似度阈值
+            similarity_mask = hamming_distances <= similarity_threshold
+            
+            # 获取相似图片对应的漫画索引
+            similar_image_positions = np.where(similarity_mask)
+            similar_comic_indices = hash_to_comic_idx[similar_image_positions[1]]
+            
+            # 统计每个漫画的相似图片数量
+            unique_comics, counts = np.unique(similar_comic_indices, return_counts=True)
+            
+            # 找到满足最小相似图片数量要求的漫画
+            valid_similar_comics = unique_comics[counts >= min_similar_images]
+            
+            # 排除自己
+            valid_similar_comics = valid_similar_comics[valid_similar_comics != comic_idx]
+            
+            if len(valid_similar_comics) > 0:
+                # 构建重复组
+                similar_comics = [comic]
+                all_similar_images = []
                 
-                # 标记已处理
-                for comic in similar_comics:
-                    processed_comics.add(comic.path)
+                for similar_comic_idx in valid_similar_comics:
+                    similar_comic = valid_comics[similar_comic_idx]
+                    if similar_comic.path not in processed_comics:
+                        similar_comics.append(similar_comic)
+                        
+                        # 收集相似图片信息
+                        comic_mask = similarity_mask & (hash_to_comic_idx[np.newaxis, :] == similar_comic_idx)
+                        comic_positions = np.where(comic_mask)
+                        
+                        for pos_i, pos_j in zip(comic_positions[0], comic_positions[1]):
+                            hash1 = list(comic.image_hashes.values())[pos_i]
+                            hash2 = list(similar_comic.image_hashes.values())[pos_j - comic_hash_ranges[similar_comic_idx][0]]
+                            similarity = int(hamming_distances[pos_i, pos_j])
+                            all_similar_images.append((hash1, hash2, similarity))
+                
+                if len(similar_comics) > 1:
+                    duplicate_group = DuplicateGroup(
+                        comics=similar_comics,
+                        similar_images=all_similar_images,
+                        similarity_count=len(all_similar_images)
+                    )
+                    duplicate_groups.append(duplicate_group)
+                    
+                    # 标记已处理
+                    for similar_comic in similar_comics:
+                        processed_comics.add(similar_comic.path)
         
+        logger.info(f"numpy优化算法检测完成，找到 {len(duplicate_groups)} 组重复漫画")
         return duplicate_groups
     
-    def _compare_comics(self, comic1: ComicInfo, comic2: ComicInfo, 
-                       threshold: int) -> List[Tuple[str, str, int]]:
-        """比较两个漫画的相似图片"""
-        similar_images = []
-        
-        for filename1, hash1 in comic1.image_hashes.items():
-            for filename2, hash2 in comic2.image_hashes.items():
-                similarity = self.image_hasher.calculate_similarity(hash1, hash2)
-                
-                if similarity <= threshold:
-                    similar_images.append((hash1, hash2, similarity))
-        
-        return similar_images
+    # _compare_comics方法已被numpy优化的_detect_duplicates方法替代，不再需要
