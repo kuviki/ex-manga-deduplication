@@ -5,6 +5,7 @@
 """
 
 import os
+import time
 import subprocess
 from typing import List, Optional
 from PyQt5.QtWidgets import (
