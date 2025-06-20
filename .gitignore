@@ -1,5 +1,7 @@
 __pycache__
+blacklist.yaml
 config.yaml
 /cache/
+/logs/
 /test.zip
 /test.rar
