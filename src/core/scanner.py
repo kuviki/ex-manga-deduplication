@@ -336,6 +336,7 @@ class Scanner(QObject):
         
         # 转换为numpy矩阵
         all_hashes_matrix = np.array(all_hashes, dtype=np.uint8)  # shape: (total_images, hash_bits)
+        all_hashes_matrix_inv = 1 - all_hashes_matrix  # shape: (total_images, hash_bits)
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
         
         logger.info(f"构建了 {all_hashes_matrix.shape[0]} x {all_hashes_matrix.shape[1]} 的哈希矩阵")
@@ -352,13 +353,7 @@ class Scanner(QObject):
             comic_hashes = all_hashes_matrix[start_idx:end_idx]  # 当前漫画的哈希矩阵
             
             # 计算当前漫画与所有图片的汉明距离矩阵
-            # 使用广播计算: (comic_images, 1, hash_bits) XOR (1, all_images, hash_bits)
-            comic_hashes_expanded = comic_hashes[:, np.newaxis, :]
-            all_hashes_expanded = all_hashes_matrix[np.newaxis, :, :]
-            
-            # 计算XOR并求和得到汉明距离
-            xor_result = comic_hashes_expanded ^ all_hashes_expanded
-            hamming_distances = np.sum(xor_result, axis=2)  # shape: (comic_images, all_images)
+            hamming_distances = np.dot(comic_hashes, all_hashes_matrix_inv.T) + np.dot(1 - comic_hashes, all_hashes_matrix.T)# shape: (comic_images, all_images)
             
             # 应用相似度阈值
             similarity_mask = hamming_distances <= similarity_threshold
