@@ -384,8 +384,8 @@ class Scanner(QObject):
             similarity_mask = hamming_distances <= similarity_threshold
             
             # 获取相似图片对应的漫画索引
-            similar_image_positions = np.where(similarity_mask)
-            similar_comic_indices = hash_to_comic_idx[similar_image_positions[1]]
+            similar_image_mask = np.any(similarity_mask, axis=0)
+            similar_comic_indices = hash_to_comic_idx[similar_image_mask]
             
             # 统计每个漫画的相似图片数量
             unique_comics, counts = np.unique(similar_comic_indices, return_counts=True)
