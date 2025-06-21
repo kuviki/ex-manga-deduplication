@@ -337,12 +337,37 @@ class Scanner(QObject):
         # 转换为numpy矩阵
         all_hashes_matrix = np.array(all_hashes, dtype=np.uint8)  # shape: (total_images, hash_bits)
         all_hashes_matrix_inv = 1 - all_hashes_matrix  # shape: (total_images, hash_bits)
+        
+        # 处理黑名单图片：将黑名单图片的哈希值置零
+        blacklist_hashes = self.blacklist_manager.get_all_hashes()
+        if blacklist_hashes:
+            blacklist_hashes_mask = np.zeros(all_hashes_matrix.shape[0], dtype=np.bool_)
+            for hash_str in blacklist_hashes:
+                # 将哈希字符串转换为numpy数组
+                    hash_obj = imagehash.hex_to_hash(hash_str)
+                    hash_array = np.array(hash_obj.hash, dtype=np.uint8)
+                    blacklist_hashes_mask[all_hashes_matrix == hash_array[None, :]] = True
+            all_hashes_matrix[blacklist_hashes_mask] = 0
+            all_hashes_matrix_inv[blacklist_hashes_mask] = 0
+
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
         
         logger.info(f"构建了 {all_hashes_matrix.shape[0]} x {all_hashes_matrix.shape[1]} 的哈希矩阵")
         
         # 对每个漫画进行重复检测
+        self.progress.processed_files = 0
+        self.progress.duplicates_found = 0
+        self.progress.total_files = len(valid_comics)
+        self.start_time = time.time()
+        
         for comic_idx, comic in enumerate(valid_comics):
+            # 更新进度
+            self.progress.processed_files += 1
+            self.progress.duplicates_found = len(duplicate_groups)
+            self.progress.current_file = os.path.basename(comic.path)
+            self.progress.elapsed_time = time.time() - self.start_time
+            self.progress_updated.emit(self.progress)
+
             if comic.path in processed_comics:
                 continue
             
