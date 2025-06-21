@@ -263,16 +263,16 @@ class SettingsDialog(QDialog):
         blacklist_layout = QFormLayout(blacklist_group)
         
         # 黑名单文件
-        blacklist_file_layout = QHBoxLayout()
-        self.blacklist_file_edit = QLineEdit()
+        blacklist_folder_layout = QHBoxLayout()
+        self.blacklist_folder_edit = QLineEdit()
         
-        blacklist_file_browse_btn = QPushButton("浏览...")
-        blacklist_file_browse_btn.clicked.connect(self.browse_blacklist_file)
+        blacklist_folder_browse_btn = QPushButton("浏览...")
+        blacklist_folder_browse_btn.clicked.connect(self.browse_blacklist_file)
         
-        blacklist_file_layout.addWidget(self.blacklist_file_edit)
-        blacklist_file_layout.addWidget(blacklist_file_browse_btn)
+        blacklist_folder_layout.addWidget(self.blacklist_folder_edit)
+        blacklist_folder_layout.addWidget(blacklist_folder_browse_btn)
         
-        blacklist_layout.addRow("黑名单文件:", blacklist_file_layout)
+        blacklist_layout.addRow("黑名单文件夹:", blacklist_folder_layout)
         
         layout.addWidget(blacklist_group)
         
@@ -320,7 +320,7 @@ class SettingsDialog(QDialog):
         self.max_workers_spinbox.setValue(self.config.get_max_workers())
         self.enable_cache_checkbox.setChecked(self.config.is_cache_enabled())
         self.cache_dir_edit.setText(self.config.get_cache_dir())
-        self.blacklist_file_edit.setText(self.config.get_blacklist_file())
+        self.blacklist_folder_edit.setText(self.config.get_blacklist_folder())
     
     def apply_settings(self):
         """应用设置"""
@@ -354,7 +354,7 @@ class SettingsDialog(QDialog):
             self.config.set("max_workers", self.max_workers_spinbox.value())
             self.config.set("enable_cache", self.enable_cache_checkbox.isChecked())
             self.config.set("cache_dir", self.cache_dir_edit.text())
-            self.config.set("blacklist_file", self.blacklist_file_edit.text())
+            self.config.set("blacklist_file", self.blacklist_folder_edit.text())
             
             # 保存配置
             self.config.save_config()
@@ -389,13 +389,13 @@ class SettingsDialog(QDialog):
             self.cache_dir_edit.setText(directory)
     
     def browse_blacklist_file(self):
-        """浏览黑名单文件"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "选择黑名单文件", self.blacklist_file_edit.text(), "YAML文件 (*.yaml);;所有文件 (*.*)"
+        """浏览黑名单文件夹"""
+        directory = QFileDialog.getExistingDirectory(
+            self, "选择黑名单文件夹", self.blacklist_folder_edit.text()
         )
         
-        if file_path:
-            self.blacklist_file_edit.setText(file_path)
+        if directory:
+            self.blacklist_folder_edit.setText(directory)
     
     def _get_algorithm_display_name(self, algorithm: HashAlgorithm) -> str:
         """获取算法显示名称"""

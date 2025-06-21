@@ -65,7 +65,7 @@ class ConfigManager:
             "preview_size": {"width": 200, "height": 200},
             
             # 黑名单设置
-            "blacklist_file": "blacklist.yaml"
+            "blacklist_folder": "blacklist"
         }
     
     def load_config(self) -> None:
@@ -185,6 +185,6 @@ class ConfigManager:
         size = self.get("preview_size", {"width": 200, "height": 200})
         return size.get("width", 200), size.get("height", 200)
     
-    def get_blacklist_file(self) -> str:
+    def get_blacklist_folder(self) -> str:
         """获取黑名单文件路径"""
-        return self.get("blacklist_file", "blacklist.yaml")
+        return self.get("blacklist_folder", "blacklist")

@@ -78,7 +78,7 @@ class Scanner(QObject):
         self.config = config_manager
         self.archive_reader = ArchiveReader(self.config.get_supported_image_formats())
         self.image_hasher = ImageHasher(self.config.get_hash_algorithm())
-        self.blacklist_manager = BlacklistManager(self.config.get_blacklist_file())
+        self.blacklist_manager = BlacklistManager(self.config.get_blacklist_folder())
         self.cache_manager = CacheManager(self.config.get_cache_dir())
         
         self.is_scanning = False
@@ -305,6 +305,20 @@ class Scanner(QObject):
             return duplicate_groups
         
         logger.info(f"开始使用numpy优化算法检测 {len(valid_comics)} 个漫画的重复")
+
+        # 生成黑名单图片哈希
+        blacklist_hashes = self.blacklist_manager.get_all_hashes()
+        if blacklist_hashes:
+            blacklist_hashes_array = []
+            for hash_str in blacklist_hashes:
+                # 将哈希字符串转换为numpy数组
+                hash_obj = imagehash.hex_to_hash(hash_str)
+                hash_array = np.array(hash_obj.hash, dtype=np.uint8)
+                blacklist_hashes_array.append(hash_array.flatten())
+            blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
+            del blacklist_hashes_array
+        else:
+            blacklist_hashes = None
         
         # 构建全局哈希数组和索引映射
         all_hashes = []
@@ -312,6 +326,7 @@ class Scanner(QObject):
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
         
         current_idx = 0
+        blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
             for hash_str in comic.image_hashes.values():
@@ -319,6 +334,15 @@ class Scanner(QObject):
                     # 将哈希字符串转换为numpy数组
                     hash_obj = imagehash.hex_to_hash(hash_str)
                     hash_array = np.array(hash_obj.hash, dtype=np.uint8)
+                    hash_array = hash_array.flatten()
+
+                    # 排除黑名单图片哈希
+                    if blacklist_hashes is not None:
+                        hamming_distances = np.dot(blacklist_hashes, hash_array)
+                        if np.any(hamming_distances <= similarity_threshold):
+                            blacklist_image_count += 1
+                            continue
+
                     all_hashes.append(hash_array.flatten())
                     hash_to_comic_idx.append(comic_idx)
                     current_idx += 1
@@ -334,32 +358,13 @@ class Scanner(QObject):
             logger.warning("没有有效的图片哈希")
             return duplicate_groups
         
+        logger.info(f"成功解析 {len(all_hashes)} 个图片哈希，其中 {blacklist_image_count} 个被排除在黑名单内")
+
         # 转换为numpy矩阵
         all_hashes_matrix = np.array(all_hashes, dtype=np.uint8)  # shape: (total_images, hash_bits)
         all_hashes_matrix_inv = 1 - all_hashes_matrix  # shape: (total_images, hash_bits)
-        
-        # 处理黑名单图片：将黑名单图片的哈希值置零
-        blacklist_hashes = self.blacklist_manager.get_all_hashes()
-        if blacklist_hashes:
-            blacklist_hashes = []
-            for hash_str in blacklist_hashes:
-                # 将哈希字符串转换为numpy数组
-                hash_obj = imagehash.hex_to_hash(hash_str)
-                hash_array = np.array(hash_obj.hash, dtype=np.uint8)
-                blacklist_hashes.append(hash_array.flatten())
-            blacklist_hashes = np.array(blacklist_hashes, dtype=np.uint8)
-
-            # 计算黑名单图片与全部图片的汉明距离矩阵
-            hamming_distances = np.dot(blacklist_hashes, all_hashes_matrix_inv.T) + np.dot(1 - blacklist_hashes, all_hashes_matrix.T)
-
-            # 应用相似度阈值
-            blacklist_hashes_mask = np.any(hamming_distances <= similarity_threshold, axis=0)
-            
-            all_hashes_matrix[blacklist_hashes_mask] = 0
-            all_hashes_matrix_inv[blacklist_hashes_mask] = 0
-
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
-        
+
         logger.info(f"构建了 {all_hashes_matrix.shape[0]} x {all_hashes_matrix.shape[1]} 的哈希矩阵")
         
         # 对每个漫画进行重复检测
