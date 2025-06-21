@@ -217,8 +217,8 @@ class DuplicateListWidget(QWidget):
         """打开文件位置"""
         try:
             if os.path.exists(file_path):
-                # Windows
-                subprocess.run(['explorer', '/select,', file_path], check=True)
+                windows_file_path = file_path.replace('/', '\\')
+                subprocess.run(['explorer', '/select,', windows_file_path], check=False)
             else:
                 QMessageBox.warning(self, "警告", "文件不存在")
         except Exception as e:
