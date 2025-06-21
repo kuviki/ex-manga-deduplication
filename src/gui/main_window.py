@@ -185,9 +185,17 @@ class MainWindow(QMainWindow):
         
         # 工具栏布局
         toolbar_layout = QVBoxLayout()
-        toolbar_layout.addWidget(dir_group, 1)
-        toolbar_layout.addWidget(control_group, 1)
-        toolbar_layout.addWidget(progress_group, 1)
+        
+        # 创建水平布局容器，放置扫描目录和扫描控制
+        top_row_layout = QHBoxLayout()
+        top_row_layout.addWidget(dir_group, 3)  # 扫描目录占更多空间
+        top_row_layout.addWidget(control_group, 1)  # 扫描控制占较少空间
+        
+        # 将水平布局和进度组添加到主布局
+        top_row_container = QWidget()
+        top_row_container.setLayout(top_row_layout)
+        toolbar_layout.addWidget(top_row_container)
+        toolbar_layout.addWidget(progress_group)
         
         toolbar_widget = QWidget()
         toolbar_widget.setLayout(toolbar_layout)
@@ -230,7 +238,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(right_widget)
         splitter.setSizes([600, 600])  # 设置初始大小比例
         
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, 1)
     
     def create_status_bar(self):
         """创建状态栏"""
