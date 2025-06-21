@@ -398,7 +398,7 @@ class MainWindow(QMainWindow):
         self.info_text.setText(info_text)
         
         # 显示图片预览
-        self.image_preview.show_comic_images(comic_info, duplicate_group)
+        self.image_preview.set_comic(comic_info, duplicate_group)
     
     def on_image_blacklisted(self, image_hash: str):
         """处理图片加入黑名单"""

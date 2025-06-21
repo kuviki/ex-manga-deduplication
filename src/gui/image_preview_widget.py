@@ -200,7 +200,7 @@ class ImagePreviewWidget(QWidget):
             indices = [int(i * step) for i in range(image_count)]
         
         # 获取预览图片尺寸
-        preview_size = self.config.get_preview_image_size()
+        preview_size = self.config.get_preview_size()
         
         # 创建加载线程
         self.load_thread = ImageLoadThread(
