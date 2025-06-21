@@ -451,7 +451,6 @@ class Scanner(QObject):
                     for similar_comic in similar_comics:
                         processed_comics.add(similar_comic.path)
         
-        logger.info(f"numpy优化算法检测完成，找到 {len(duplicate_groups)} 组重复漫画")
         return duplicate_groups
     
     # _compare_comics方法已被numpy优化的_detect_duplicates方法替代，不再需要

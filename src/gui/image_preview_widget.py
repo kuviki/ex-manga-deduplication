@@ -8,11 +8,13 @@ import os
 from typing import Optional, List, Dict
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea,
-    QPushButton, QSlider, QSpinBox, QFrame, QSizePolicy
+    QPushButton, QSlider, QSpinBox, QFrame, QSizePolicy, QApplication
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QFont, QPainter, QPen
 from loguru import logger
+
+from src.utils.file_utils import natural_sort_key
 
 from ..core.config_manager import ConfigManager
 from ..core.scanner import ComicInfo, DuplicateGroup
@@ -160,6 +162,7 @@ class ImagePreviewWidget(QWidget):
         self.image_pixmaps = {}  # {index: QPixmap} or {hash: QPixmap}
         self.load_thread = None
         self.show_duplicates_only = True  # 新增：是否只显示重复图片
+        self.load_finished = False  # 新增：是否加载完成
         
         self.init_ui()
     
@@ -276,8 +279,11 @@ class ImagePreviewWidget(QWidget):
         
         # 停止之前的加载线程
         if self.load_thread and self.load_thread.isRunning():
+            self.load_finished = False
             self.load_thread.stop()
             self.load_thread.wait()
+            while not self.load_finished:
+                QApplication.processEvents()
         
         # 清空现有图片
         self.clear_images()
@@ -316,8 +322,9 @@ class ImagePreviewWidget(QWidget):
             return
 
         # 按漫画原顺序排序
+        sorted_image_hashes = sorted(self.current_comic.image_hashes.items(), key=lambda x: natural_sort_key(x[0]))
         sorted_target_hashes = []
-        for _image_name, image_hash in self.current_comic.image_hashes.items():
+        for _image_name, image_hash in sorted_image_hashes:
             if image_hash in target_hashes:
                 sorted_target_hashes.append(image_hash)
         
@@ -395,6 +402,7 @@ class ImagePreviewWidget(QWidget):
         """处理加载完成"""
         loaded_count = len(self.image_pixmaps)
         self.status_label.setText(f"已加载 {loaded_count} 张图片")
+        self.load_finished = True
     
     def add_image_to_display(self, index: int, pixmap: QPixmap, filename: str):
         """添加图片到显示区域"""
