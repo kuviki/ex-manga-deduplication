@@ -416,12 +416,12 @@ class Scanner(QObject):
             start_idx, end_idx = comic_hash_ranges[comic_idx]
             comic_hashes = all_hashes_matrix[start_idx:end_idx]  # 当前漫画的哈希矩阵
 
-            # 计算当前漫画与后续图片的汉明距离矩阵
+            # 计算当前漫画图片与后续图片的汉明距离矩阵
             sub_hashes_matrix_inv = all_hashes_matrix_inv[end_idx:]
             sub_hashes_matrix = all_hashes_matrix[end_idx:]
             hamming_distances = np.dot(comic_hashes, sub_hashes_matrix_inv.T) + np.dot(
                 1 - comic_hashes, sub_hashes_matrix.T
-            )  # shape: (sub_comic_images, all_images)
+            )  # shape: (comic_images, all_images)
 
             # 应用相似度阈值
             similarity_mask = hamming_distances <= similarity_threshold
