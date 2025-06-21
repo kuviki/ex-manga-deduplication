@@ -52,7 +52,7 @@ class ConfigManager:
             "error_handling": ErrorHandling.ASK.value,
             
             # 扫描设置
-            "supported_formats": [".zip", ".rar"],
+            "supported_formats": [".zip", ".rar", ".cbr", ".cbz"],
             "supported_image_formats": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"],
             "max_workers": 4,
             
@@ -153,7 +153,7 @@ class ConfigManager:
     
     def get_supported_formats(self) -> list:
         """获取支持的压缩包格式"""
-        return self.get("supported_formats", [".zip", ".rar"])
+        return self.get("supported_formats", [".zip", ".rar", ".cbr", ".cbz"])
     
     def get_supported_image_formats(self) -> list:
         """获取支持的图片格式"""

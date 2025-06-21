@@ -102,7 +102,7 @@ class AboutDialog(QDialog):
         description = QLabel(
             "一个功能强大的漫画重复文件检测工具，支持多种压缩格式和图像哈希算法。\n\n"
             "主要功能：\n"
-            "• 支持 ZIP/RAR 格式的漫画文件\n"
+            "• 支持 ZIP/RAR/CBR/CBZ 格式的漫画文件\n"
             "• 多种图像哈希算法（感知哈希、差异哈希等）\n"
             "• 可配置的相似度阈值\n"
             "• 图片预览和详细信息显示\n"

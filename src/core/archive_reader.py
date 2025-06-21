@@ -34,7 +34,7 @@ class ArchiveReader:
             bool: 是否支持
         """
         ext = os.path.splitext(file_path)[1].lower()
-        return ext in ['.zip', '.rar']
+        return ext in ['.zip', '.rar', '.cbr', '.cbz']
     
     def is_image_file(self, filename: str) -> bool:
         """检查是否为图片文件
@@ -60,13 +60,13 @@ class ArchiveReader:
         try:
             image_files = []
             
-            if archive_path.lower().endswith('.zip'):
+            if archive_path.lower().endswith(('.zip', '.cbz')):
                 with zipfile.ZipFile(archive_path, 'r') as archive:
                     for filename in archive.namelist():
                         if self.is_image_file(filename) and not filename.endswith('/'):
                             image_files.append(filename)
             
-            elif archive_path.lower().endswith('.rar'):
+            elif archive_path.lower().endswith(('.rar', '.cbr')):
                 with rarfile.RarFile(archive_path, 'r') as archive:
                     for filename in archive.namelist():
                         if self.is_image_file(filename) and not filename.endswith('/'):
@@ -91,11 +91,11 @@ class ArchiveReader:
             Optional[bytes]: 图片数据，失败时返回None
         """
         try:
-            if archive_path.lower().endswith('.zip'):
+            if archive_path.lower().endswith(('.zip', '.cbz')):
                 with zipfile.ZipFile(archive_path, 'r') as archive:
                     return archive.read(image_filename)
             
-            elif archive_path.lower().endswith('.rar'):
+            elif archive_path.lower().endswith(('.rar', '.cbr')):
                 with rarfile.RarFile(archive_path, 'r') as archive:
                     return archive.read(image_filename)
             
@@ -140,12 +140,12 @@ class ArchiveReader:
                 'image_list': []
             }
             
-            if archive_path.lower().endswith('.zip'):
+            if archive_path.lower().endswith(('.zip', '.cbz')):
                 with zipfile.ZipFile(archive_path, 'r') as archive:
                     all_files = archive.namelist()
                     info['total_files'] = len([f for f in all_files if not f.endswith('/')])
                     
-            elif archive_path.lower().endswith('.rar'):
+            elif archive_path.lower().endswith(('.rar', '.cbr')):
                 with rarfile.RarFile(archive_path, 'r') as archive:
                     all_files = archive.namelist()
                     info['total_files'] = len([f for f in all_files if not f.endswith('/')])

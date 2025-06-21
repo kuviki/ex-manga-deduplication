@@ -145,7 +145,7 @@ class SettingsDialog(QDialog):
         format_layout = QVBoxLayout(format_group)
         
         format_info = QLabel(
-            "压缩包格式: ZIP, RAR\n"
+            "压缩包格式: ZIP, RAR, CBR, CBZ\n"
             "图片格式: JPG, PNG, GIF, BMP, WEBP"
         )
         format_info.setWordWrap(True)
