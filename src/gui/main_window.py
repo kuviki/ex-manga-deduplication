@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
     QStatusBar,
 )
 from PyQt5.QtCore import Qt, QThread
+from PyQt5.QtGui import QFont
 from loguru import logger
 from send2trash import send2trash
 
@@ -219,12 +220,27 @@ class MainWindow(QMainWindow):
         # 创建分割器
         splitter = QSplitter(Qt.Horizontal)
 
-        # 左侧：重复漫画列表
+        # 左侧：重复漫画列表和详情
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+
+        # 重复漫画列表
         self.duplicate_list = DuplicateListWidget(self.config)
         self.duplicate_list.comic_selected.connect(self.on_comic_selected)
         self.duplicate_list.comics_to_delete.connect(self.delete_comics)
 
-        # 右侧：图片预览和详情
+        # 详情信息
+        self.info_text = QTextEdit()
+        self.info_text.setMaximumHeight(150)
+        self.info_text.setReadOnly(True)
+
+        left_layout.addWidget(self.duplicate_list, 3)
+        title_label = QLabel("详情信息")
+        title_label.setFont(QFont("Arial", 12, QFont.Bold))
+        left_layout.addWidget(title_label)
+        left_layout.addWidget(self.info_text, 1)
+
+        # 右侧：图片预览
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
 
@@ -232,19 +248,12 @@ class MainWindow(QMainWindow):
         self.image_preview = ImagePreviewWidget(self.config)
         self.image_preview.image_blacklisted.connect(self.on_image_blacklisted)
 
-        # 详情信息
-        self.info_text = QTextEdit()
-        self.info_text.setMaximumHeight(150)
-        self.info_text.setReadOnly(True)
-
-        right_layout.addWidget(self.image_preview, 3)
-        right_layout.addWidget(QLabel("详细信息:"))
-        right_layout.addWidget(self.info_text, 1)
+        right_layout.addWidget(self.image_preview)
 
         # 添加到分割器
-        splitter.addWidget(self.duplicate_list)
+        splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
-        splitter.setSizes([600, 600])  # 设置初始大小比例
+        splitter.setSizes([800, 400])  # 设置初始大小比例
 
         main_layout.addWidget(splitter, 1)
 
