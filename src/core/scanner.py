@@ -269,7 +269,7 @@ class Scanner(QObject):
             )
             
             # 保存到缓存
-            if self.config.is_cache_enabled():
+            if not self.should_stop and self.config.is_cache_enabled():
                 self.cache_manager.set_comic_cache(
                     file_path, mtime, self.config.get_hash_algorithm(),
                     {
@@ -295,9 +295,6 @@ class Scanner(QObject):
         """检测重复漫画 - 使用numpy优化的高性能实现"""
         duplicate_groups = []
         processed_comics = set()
-
-        # 调试用
-        # comic_infos = comic_infos[0:500]
         
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
@@ -383,6 +380,14 @@ class Scanner(QObject):
             self.progress.current_file = os.path.basename(comic.path)
             self.progress.elapsed_time = time.time() - self.start_time
             self.progress_updated.emit(self.progress)
+
+            # 等待暂停
+            while self.is_paused and not self.should_stop:
+                time.sleep(0.1)
+
+            if self.should_stop:
+                logger.info("检测已停止")
+                break
 
             if comic.path in processed_comics:
                 continue
