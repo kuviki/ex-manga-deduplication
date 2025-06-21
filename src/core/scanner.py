@@ -297,7 +297,7 @@ class Scanner(QObject):
         processed_comics = set()
 
         # 调试用
-        # comic_infos = comic_infos[500:800]
+        # comic_infos = comic_infos[0:500]
         
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()

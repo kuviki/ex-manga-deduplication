@@ -203,7 +203,7 @@ class DuplicateListWidget(QWidget):
             check_action.triggered.connect(lambda: item.setCheckState(0, Qt.Checked))
         
         # 选择同组其他文件
-        select_group_action = menu.addAction("选择同组其他文件")
+        select_group_action = menu.addAction("选择同组文件")
         select_group_action.triggered.connect(lambda: self.select_group_items(data['group']))
         
         menu.addSeparator()
