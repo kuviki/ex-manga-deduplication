@@ -4,8 +4,4 @@
 包含各种实用工具函数和类
 """
 
-__all__ = [
-    'file_utils',
-    'image_utils',
-    'ui_utils'
-]
+__all__ = ["file_utils", "image_utils", "ui_utils"]
