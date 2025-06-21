@@ -36,13 +36,25 @@ class ImageLoadThread(QThread):
         try:
             archive_reader = ArchiveReader()
             
+            # 获取压缩包中的所有图片文件
+            image_files = archive_reader.get_image_files(self.comic_path)
+            if not image_files:
+                logger.error(f"压缩包中没有图片文件: {self.comic_path}")
+                return
+            
             for index in self.image_indices:
                 if self._stop_requested:
                     break
                 
                 try:
+                    # 确保索引在有效范围内
+                    if index < 0 or index >= len(image_files):
+                        logger.warning(f"图片索引超出范围: {index}, 总图片数: {len(image_files)}")
+                        continue
+                    
                     # 读取图片数据
-                    image_data = archive_reader.read_image_at_index(self.comic_path, index)
+                    image_filename = image_files[index]
+                    image_data = archive_reader.read_image(self.comic_path, image_filename)
                     if not image_data:
                         continue
                     
