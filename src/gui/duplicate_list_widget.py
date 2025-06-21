@@ -187,9 +187,10 @@ class DuplicateListWidget(QWidget):
         if viewer_path and os.path.exists(viewer_path):
             open_viewer_action = menu.addAction("用查看器打开")
             open_viewer_action.triggered.connect(lambda: self.open_with_viewer(comic.path))
-        else:
-            open_default_action = menu.addAction("用默认程序打开")
-            open_default_action.triggered.connect(lambda: self.open_with_default(comic.path))
+
+        # 用默认程序打开
+        open_default_action = menu.addAction("用默认程序打开")
+        open_default_action.triggered.connect(lambda: self.open_with_default(comic.path))
         
         menu.addSeparator()
         
