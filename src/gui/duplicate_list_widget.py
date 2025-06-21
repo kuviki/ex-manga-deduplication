@@ -218,7 +218,7 @@ class DuplicateListWidget(QWidget):
         try:
             if os.path.exists(file_path):
                 windows_file_path = file_path.replace('/', '\\')
-                subprocess.run(['explorer', '/select,', windows_file_path], check=False)
+                subprocess.run(['explorer', '/select,', windows_file_path])
             else:
                 QMessageBox.warning(self, "警告", "文件不存在")
         except Exception as e:
@@ -230,7 +230,7 @@ class DuplicateListWidget(QWidget):
         try:
             viewer_path = self.config.get_comic_viewer_path()
             if viewer_path and os.path.exists(viewer_path):
-                subprocess.run([viewer_path, file_path], check=True)
+                subprocess.run([viewer_path, file_path])
             else:
                 QMessageBox.warning(self, "警告", "查看器程序不存在")
         except Exception as e:
