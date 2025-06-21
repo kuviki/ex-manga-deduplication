@@ -291,11 +291,11 @@ class ImagePreviewWidget(QWidget):
         duplicate_count = 0
         if self.current_group and self.current_group.similar_images:
             current_comic_hashes = set(comic.image_hashes.values())
-            for hash1, hash2, similarity in self.current_group.similar_images:
+            for hash1, hash2, _similarity in self.current_group.similar_images:
                 if hash1 in current_comic_hashes or hash2 in current_comic_hashes:
                     duplicate_count += 1
 
-        info_text = f"大小: {size_str} | 总图片数: {comic.image_count} | 重复图片数: {duplicate_count}"
+        info_text = f"大小: {size_str} | 总图片数: {comic.image_count}"
         self.info_label.setText(info_text)
 
         mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
