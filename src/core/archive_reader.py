@@ -11,6 +11,7 @@ from typing import List, Dict, Generator, Tuple, Optional
 from io import BytesIO
 from loguru import logger
 from PIL import Image
+from ..utils.file_utils import natural_sort_key
 
 class ArchiveReader:
     """压缩包读取器"""
@@ -73,7 +74,7 @@ class ArchiveReader:
                             image_files.append(filename)
             
             # 自然排序
-            image_files.sort(key=self._natural_sort_key)
+            image_files.sort(key=natural_sort_key)
             return image_files
             
         except Exception as e:
@@ -186,25 +187,6 @@ class ArchiveReader:
                 return True
         except Exception:
             return False
-    
-    def _natural_sort_key(self, filename: str) -> List:
-        """自然排序键函数
-        
-        Args:
-            filename: 文件名
-            
-        Returns:
-            List: 排序键
-        """
-        import re
-        
-        def convert(text):
-            return int(text) if text.isdigit() else text.lower()
-        
-        def alphanum_key(key):
-            return [convert(c) for c in re.split('([0-9]+)', key)]
-        
-        return alphanum_key(filename)
 
 class ArchiveCache:
     """压缩包信息缓存"""

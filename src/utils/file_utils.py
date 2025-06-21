@@ -298,3 +298,22 @@ def backup_file(file_path: str, backup_dir: Optional[str] = None) -> Optional[st
     except Exception as e:
         logger.error(f"备份文件失败 {file_path}: {e}")
         return None
+
+def natural_sort_key(filename: str) -> List:
+        """自然排序键函数
+        
+        Args:
+            filename: 文件名
+            
+        Returns:
+            List: 排序键
+        """
+        import re
+        
+        def convert(text):
+            return int(text) if text.isdigit() else text.lower()
+        
+        def alphanum_key(key):
+            return [convert(c) for c in re.split('([0-9]+)', key)]
+        
+        return alphanum_key(filename)
