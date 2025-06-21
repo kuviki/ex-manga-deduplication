@@ -353,7 +353,7 @@ class Scanner(QObject):
             hamming_distances = np.dot(blacklist_hashes, all_hashes_matrix_inv.T) + np.dot(1 - blacklist_hashes, all_hashes_matrix.T)
 
             # 应用相似度阈值
-            blacklist_hashes_mask = hamming_distances <= similarity_threshold
+            blacklist_hashes_mask = np.any(hamming_distances <= similarity_threshold, axis=0)
             
             all_hashes_matrix[blacklist_hashes_mask] = 0
             all_hashes_matrix_inv[blacklist_hashes_mask] = 0
