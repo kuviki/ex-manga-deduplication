@@ -28,7 +28,7 @@ from loguru import logger
 from send2trash import send2trash
 
 from ..core.config_manager import ConfigManager
-from ..core.scanner import Scanner, ScanProgress, DuplicateGroup
+from ..core.scanner import Scanner, ScanProgress, DuplicateGroup, ComicInfo
 from .settings_dialog import SettingsDialog
 from .image_preview_widget import ImagePreviewWidget
 from .duplicate_list_widget import DuplicateListWidget
@@ -401,17 +401,23 @@ class MainWindow(QMainWindow):
         self.pause_btn.setText("暂停")
         self.status_label.setText("扫描进行中...")
 
-    def on_comic_selected(self, comic_info, duplicate_group):
+    def on_comic_selected(
+        self,
+        comic_info: ComicInfo,
+        duplicate_group: DuplicateGroup,
+        duplicate_count: int,
+    ):
         """处理漫画选择"""
         # 显示漫画信息
         info_text = f"文件路径: {comic_info.path}\n"
         info_text += f"文件大小: {comic_info.size / 1024 / 1024:.2f} MB\n"
         info_text += f"图片数量: {comic_info.image_count}\n"
+        info_text += f"重复图片数量: {duplicate_count}\n"
         info_text += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic_info.mtime))}\n"
 
         if duplicate_group:
             info_text += "\n重复组信息:\n"
-            info_text += f"相似图片数量: {duplicate_group.similarity_count}\n"
+            info_text += f"相似图片组数: {duplicate_group.similarity_count}\n"
             info_text += f"组内漫画数量: {len(duplicate_group.comics)}\n"
 
         self.info_text.setText(info_text)

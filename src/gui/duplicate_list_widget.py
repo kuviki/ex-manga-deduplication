@@ -31,7 +31,7 @@ class DuplicateListWidget(QWidget):
     """重复漫画列表组件"""
 
     # 信号定义
-    comic_selected = pyqtSignal(object, object)  # ComicInfo, DuplicateGroup
+    comic_selected = pyqtSignal(object, object, int)  # ComicInfo, DuplicateGroup
     comics_to_delete = pyqtSignal(list)  # List[str] - comic paths
 
     def __init__(self, config_manager: ConfigManager, parent=None):
@@ -61,7 +61,9 @@ class DuplicateListWidget(QWidget):
 
         # 树形控件
         self.tree_widget = QTreeWidget()
-        self.tree_widget.setHeaderLabels(["漫画文件", "大小", "图片数", "相似度"])
+        self.tree_widget.setHeaderLabels(
+            ["漫画文件", "大小", "图片数 (重复图片)", "相似度"]
+        )
         self.tree_widget.setRootIsDecorated(True)
         self.tree_widget.setAlternatingRowColors(True)
         self.tree_widget.setSelectionMode(QTreeWidget.ExtendedSelection)
@@ -125,7 +127,7 @@ class DuplicateListWidget(QWidget):
             # 创建组节点
             group_item = QTreeWidgetItem(self.tree_widget)
             group_item.setText(0, f"重复组 {i} ({len(group.comics)} 个文件)")
-            group_item.setText(3, f"{group.similarity_count} 个相似图片")
+            group_item.setText(3, f"{group.similarity_count} 组相似图片")
 
             # 设置组节点样式
             font = QFont()
@@ -136,19 +138,37 @@ class DuplicateListWidget(QWidget):
             # 存储组数据
             group_item.setData(0, Qt.UserRole, {"type": "group", "group": group})
 
+            # 收集当前漫画相关的重复图片哈希
+            group_image_hashes = set()
+            for hash1, hash2, _similarity in group.similar_images:
+                group_image_hashes.add(hash1)
+                group_image_hashes.add(hash2)
+
             # 添加漫画节点
             for comic in group.comics:
+                # 计算当前漫画的重复图片数量
+                comic_duplicate_count = len(
+                    group_image_hashes.intersection(comic.image_hashes.values())
+                )
+
                 comic_item = QTreeWidgetItem(group_item)
                 comic_item.setText(0, os.path.basename(comic.path))
                 comic_item.setText(1, self._format_file_size(comic.size))
-                comic_item.setText(2, str(comic.image_count))
+                comic_item.setText(2, f"{comic.image_count} ({comic_duplicate_count})")
 
                 # 设置工具提示
                 comic_item.setToolTip(0, comic.path)
 
                 # 存储漫画数据
                 comic_item.setData(
-                    0, Qt.UserRole, {"type": "comic", "comic": comic, "group": group}
+                    0,
+                    Qt.UserRole,
+                    {
+                        "type": "comic",
+                        "comic": comic,
+                        "group": group,
+                        "duplicate_count": comic_duplicate_count,
+                    },
                 )
 
                 # 添加复选框
@@ -173,7 +193,9 @@ class DuplicateListWidget(QWidget):
 
         if data["type"] == "comic":
             # 发射漫画选择信号
-            self.comic_selected.emit(data["comic"], data["group"])
+            self.comic_selected.emit(
+                data["comic"], data["group"], data["duplicate_count"]
+            )
 
     def show_context_menu(self, position):
         """显示右键菜单"""
