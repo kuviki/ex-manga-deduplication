@@ -184,8 +184,8 @@ class MainWindow(QMainWindow):
         progress_layout.addWidget(self.progress_label)
         
         # 工具栏布局
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.addWidget(dir_group, 2)
+        toolbar_layout = QVBoxLayout()
+        toolbar_layout.addWidget(dir_group, 1)
         toolbar_layout.addWidget(control_group, 1)
         toolbar_layout.addWidget(progress_group, 1)
         
