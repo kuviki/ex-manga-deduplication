@@ -341,12 +341,20 @@ class Scanner(QObject):
         # 处理黑名单图片：将黑名单图片的哈希值置零
         blacklist_hashes = self.blacklist_manager.get_all_hashes()
         if blacklist_hashes:
-            blacklist_hashes_mask = np.zeros(all_hashes_matrix.shape[0], dtype=np.bool_)
+            blacklist_hashes = []
             for hash_str in blacklist_hashes:
                 # 将哈希字符串转换为numpy数组
-                    hash_obj = imagehash.hex_to_hash(hash_str)
-                    hash_array = np.array(hash_obj.hash, dtype=np.uint8)
-                    blacklist_hashes_mask[all_hashes_matrix == hash_array[None, :]] = True
+                hash_obj = imagehash.hex_to_hash(hash_str)
+                hash_array = np.array(hash_obj.hash, dtype=np.uint8)
+                blacklist_hashes.append(hash_array.flatten())
+            blacklist_hashes = np.array(blacklist_hashes, dtype=np.uint8)
+
+            # 计算黑名单图片与全部图片的汉明距离矩阵
+            hamming_distances = np.dot(blacklist_hashes, all_hashes_matrix_inv.T) + np.dot(1 - blacklist_hashes, all_hashes_matrix.T)
+
+            # 应用相似度阈值
+            blacklist_hashes_mask = hamming_distances <= similarity_threshold
+            
             all_hashes_matrix[blacklist_hashes_mask] = 0
             all_hashes_matrix_inv[blacklist_hashes_mask] = 0
 
