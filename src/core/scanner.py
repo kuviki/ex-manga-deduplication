@@ -295,6 +295,9 @@ class Scanner(QObject):
         """检测重复漫画 - 使用numpy优化的高性能实现"""
         duplicate_groups = []
         processed_comics = set()
+
+        # 调试用
+        # comic_infos = comic_infos[500:800]
         
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()

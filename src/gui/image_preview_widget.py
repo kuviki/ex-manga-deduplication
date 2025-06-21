@@ -168,7 +168,8 @@ class ImagePreviewWidget(QWidget):
         layout = QVBoxLayout(self)
         
         # 标题
-        self.title_label = QLabel("图片预览")
+        mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
+        self.title_label = QLabel(f"图片预览 ({mode_text})")
         self.title_label.setFont(QFont("Arial", 12, QFont.Bold))
         layout.addWidget(self.title_label)
         
@@ -245,7 +246,8 @@ class ImagePreviewWidget(QWidget):
         """更新漫画信息显示"""
         if not self.current_comic:
             self.info_label.setText("请选择一个漫画文件")
-            self.title_label.setText("图片预览")
+            mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
+            self.title_label.setText(f"图片预览 ({mode_text})")
             return
         
         comic = self.current_comic
@@ -260,11 +262,11 @@ class ImagePreviewWidget(QWidget):
                 if hash1 in current_comic_hashes or hash2 in current_comic_hashes:
                     duplicate_count += 1
         
-        info_text = f"文件: {filename}\n大小: {size_str} | 总图片数: {comic.image_count} | 重复图片数: {duplicate_count}"
+        info_text = f"大小: {size_str} | 总图片数: {comic.image_count} | 重复图片数: {duplicate_count}"
         self.info_label.setText(info_text)
         
         mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
-        self.title_label.setText(f"图片预览 ({mode_text}) - {filename}")
+        self.title_label.setText(f"图片预览 ({mode_text})")
     
     def load_preview_images(self):
         """加载预览图片"""
@@ -447,8 +449,7 @@ class ImagePreviewWidget(QWidget):
         image_label.setScaledContents(False)
         
         # 图片信息
-        comic_name = os.path.basename(comic_path)
-        info_text = f"重复图片: {filename}\n来源: {comic_name}\n({pixmap.width()}x{pixmap.height()})"
+        info_text = f"重复图片: {filename}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setStyleSheet("font-size: 10px; color: #ff9800; font-weight: bold;")
@@ -538,6 +539,9 @@ class ImagePreviewWidget(QWidget):
         """显示模式改变时的处理"""
         self.show_duplicates_only = checked
         
+        mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
+        self.title_label.setText(f"图片预览 ({mode_text})")
+        
         # 更新图片数量控件的可用性
         self.image_count_spinbox.setEnabled(not checked)
         
@@ -568,7 +572,8 @@ class ImagePreviewWidget(QWidget):
         self.clear_images()
         
         self.info_label.setText("请选择一个漫画文件")
-        self.title_label.setText("图片预览")
+        mode_text = "重复图片" if self.show_duplicates_only else "全部图片"
+        self.title_label.setText(f"图片预览 ({mode_text})")
         self.status_label.setText("")
     
     def refresh_preview(self):
