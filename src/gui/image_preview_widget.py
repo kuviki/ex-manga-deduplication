@@ -302,18 +302,24 @@ class ImagePreviewWidget(QWidget):
         current_comic_hashes = set(self.current_comic.image_hashes.values())
         target_hashes = []
         
-        for hash1, hash2, similarity in self.current_group.similar_images:
+        for hash1, hash2, _similarity in self.current_group.similar_images:
             if hash1 in current_comic_hashes:
                 target_hashes.append(hash1)
             if hash2 in current_comic_hashes:
                 target_hashes.append(hash2)
         
         # 去重
-        target_hashes = list(set(target_hashes))
+        target_hashes = set(target_hashes)
         
         if not target_hashes:
             self.status_label.setText("当前漫画没有重复图片")
             return
+
+        # 按漫画原顺序排序
+        sorted_target_hashes = []
+        for _image_name, image_hash in self.current_comic.image_hashes.items():
+            if image_hash in target_hashes:
+                sorted_target_hashes.append(image_hash)
         
         # 构建漫画哈希映射
         comic_hashes = {}
@@ -322,14 +328,14 @@ class ImagePreviewWidget(QWidget):
         
         # 创建重复图片加载线程
         self.load_thread = DuplicateImageLoadThread(
-            comic_hashes, target_hashes, preview_size
+            comic_hashes, sorted_target_hashes, preview_size
         )
         self.load_thread.image_loaded.connect(self.on_duplicate_image_loaded)
         self.load_thread.load_error.connect(self.on_duplicate_image_load_error)
         self.load_thread.finished.connect(self.on_load_finished)
         
         # 显示加载状态
-        self.status_label.setText(f"正在加载 {len(target_hashes)} 张重复图片...")
+        self.status_label.setText(f"正在加载 {len(sorted_target_hashes)} 张重复图片...")
         
         # 开始加载
         self.load_thread.start()
