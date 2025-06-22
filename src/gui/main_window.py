@@ -300,6 +300,7 @@ class MainWindow(QMainWindow):
         )
 
         if directory:
+            directory = directory.replace("/", "\\")
             self.dir_label.setText(directory)
             self.dir_label.setStyleSheet("color: black; font-style: normal;")
             self.scan_btn.setEnabled(True)

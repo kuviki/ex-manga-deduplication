@@ -426,6 +426,7 @@ class SettingsDialog(QDialog):
         )
 
         if file_path:
+            file_path = file_path.replace("/", "\\")
             self.comic_viewer_edit.setText(file_path)
 
     def browse_cache_dir(self):
@@ -435,6 +436,7 @@ class SettingsDialog(QDialog):
         )
 
         if directory:
+            directory = directory.replace("/", "\\")
             self.cache_dir_edit.setText(directory)
 
     def browse_blacklist_file(self):
@@ -444,6 +446,7 @@ class SettingsDialog(QDialog):
         )
 
         if directory:
+            directory = directory.replace("/", "\\")
             self.blacklist_folder_edit.setText(directory)
 
     def _get_algorithm_display_name(self, algorithm: HashAlgorithm) -> str:

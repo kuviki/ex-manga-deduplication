@@ -108,7 +108,7 @@ def select_directory(
             start_dir,
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
         )
-        return directory if directory else None
+        return directory.replace("/", "\\") if directory else None
 
     except Exception as e:
         logger.error(f"选择目录失败: {e}")
@@ -126,7 +126,7 @@ def select_file(
         file_path, _ = QFileDialog.getOpenFileName(
             parent, title, start_dir, file_filter
         )
-        return file_path if file_path else None
+        return file_path.replace("/", "\\") if file_path else None
 
     except Exception as e:
         logger.error(f"选择文件失败: {e}")
@@ -144,7 +144,7 @@ def select_files(
         file_paths, _ = QFileDialog.getOpenFileNames(
             parent, title, start_dir, file_filter
         )
-        return file_paths
+        return [path.replace("/", "\\") for path in file_paths]
 
     except Exception as e:
         logger.error(f"选择文件失败: {e}")
@@ -162,7 +162,7 @@ def save_file(
         file_path, _ = QFileDialog.getSaveFileName(
             parent, title, start_dir, file_filter
         )
-        return file_path if file_path else None
+        return file_path.replace("/", "\\") if file_path else None
 
     except Exception as e:
         logger.error(f"保存文件失败: {e}")

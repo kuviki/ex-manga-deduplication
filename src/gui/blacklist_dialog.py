@@ -290,6 +290,9 @@ class BlacklistDialog(QDialog):
         if not file_paths:
             return
 
+        # 转换路径为Windows格式
+        file_paths = [path.replace("/", "\\") for path in file_paths]
+
         # 过滤有效的图片文件
         valid_files = []
         for file_path in file_paths:
@@ -419,6 +422,7 @@ class BlacklistDialog(QDialog):
         )
 
         if file_path:
+            file_path = file_path.replace("/", "\\")
             try:
                 imported_count = self.blacklist_manager.import_blacklist(file_path)
                 self.load_blacklist()
