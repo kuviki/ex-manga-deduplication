@@ -6,6 +6,7 @@
 
 import os
 import time
+import pickle
 import numpy as np
 import imagehash
 from typing import List, Tuple, Optional
@@ -302,6 +303,14 @@ class Scanner(QObject):
         duplicate_groups = []
         processed_comic_indices = set()
 
+        # 加载缓存
+        try:
+            with open("index.db", "rb") as f:
+                similar_comic_cache_keys, skipped_comic_cache_keys = pickle.load(f)
+        except Exception:
+            similar_comic_cache_keys = set()
+            skipped_comic_cache_keys = set()
+
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
         min_image_count, max_image_count = self.config.get_comic_image_count_range()
@@ -415,6 +424,8 @@ class Scanner(QObject):
                 logger.info("检测已停止")
                 break
 
+            skipped_comic_cache_keys.add(comic.cache_key)
+
             if comic_idx in processed_comic_indices:
                 continue
 
@@ -492,6 +503,20 @@ class Scanner(QObject):
 
                 # 标记已处理
                 processed_comic_indices.update(valid_similar_comics)
+
+                # 更新缓存并持久化
+                similar_comic_cache_keys.update(
+                    comic.cache_key for comic in similar_comics
+                )
+                try:
+                    with open("index.db", "wb") as f:
+                        pickle.dump(
+                            (similar_comic_cache_keys, skipped_comic_cache_keys),
+                            f,
+                            protocol=pickle.HIGHEST_PROTOCOL,
+                        )
+                except Exception as e:
+                    logger.error(f"更新缓存 index.db 失败: {e}")
 
         return duplicate_groups
 
