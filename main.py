@@ -45,14 +45,14 @@ def main():
     setup_logging()
     logger.info("启动漫画去重工具")
 
+    # 设置高DPI支持
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
     # 创建应用程序
     app = QApplication(sys.argv)
     app.setApplicationName("Ex-漫画去重工具")
     app.setApplicationVersion("1.0.0")
-
-    # 设置高DPI支持
-    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     try:
         # 初始化配置管理器
