@@ -59,7 +59,9 @@ class ComicInfo:
     size: int
     mtime: float
     image_count: int
-    image_hashes: Dict[str, str]  # filename -> hash TODO: 改为有序字典
+    image_hashes: Dict[
+        str, str
+    ]  # filename -> hash TODO: 改为有序字典，添加哈希数组字段
     error: Optional[str] = None
 
 
@@ -362,8 +364,7 @@ class Scanner(QObject):
                 try:
                     # 将哈希字符串转换为numpy数组
                     hash_obj = imagehash.hex_to_hash(hash_str)
-                    hash_array = np.array(hash_obj.hash, dtype=np.uint8)
-                    hash_array = hash_array.flatten()
+                    hash_array = hash_obj.hash.flatten()
 
                     # 排除黑名单图片哈希
                     if blacklist_hashes is not None:
@@ -372,7 +373,7 @@ class Scanner(QObject):
                             blacklist_image_count += 1
                             continue
 
-                    all_hashes.append(hash_array.flatten())
+                    all_hashes.append(hash_array)
                     hash_to_comic_idx.append(comic_idx)
                     hash_str_list.append(hash_str)
                     current_idx += 1
@@ -393,12 +394,8 @@ class Scanner(QObject):
         )
 
         # 转换为numpy矩阵
-        all_hashes_matrix = np.array(
-            all_hashes, dtype=np.uint8
-        )  # shape: (total_images, hash_bits)
-        all_hashes_matrix_inv = (
-            1 - all_hashes_matrix
-        )  # shape: (total_images, hash_bits)
+        all_hashes_matrix = np.array(all_hashes)  # shape: (total_images, hash_bits)
+        all_hashes_matrix_inv = ~all_hashes_matrix
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
 
         logger.info(
@@ -435,7 +432,9 @@ class Scanner(QObject):
                 continue
 
             start_idx, end_idx = comic_hash_ranges[comic_idx]
-            comic_hashes = all_hashes_matrix[start_idx:end_idx]  # 当前漫画的哈希矩阵
+            comic_hashes = all_hashes_matrix[start_idx:end_idx].astype(
+                np.uint8
+            )  # 当前漫画的哈希矩阵
 
             # 计算当前漫画图片与后续图片的汉明距离矩阵
             sub_hashes_matrix_inv = all_hashes_matrix_inv[end_idx:]
