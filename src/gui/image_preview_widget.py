@@ -4,7 +4,8 @@
 用于显示选中漫画的图片预览
 """
 
-from typing import List, Dict
+import numpy as np
+from typing import List, Tuple
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -38,7 +39,7 @@ class ImageLoadThread(QThread):
     def __init__(
         self,
         comic_path: str,
-        comic_hashes: Dict[str, str],
+        comic_hashes: List[Tuple[str, str, np.ndarray]],
         image_indices: List[int],
         max_size: tuple,
     ):
@@ -93,9 +94,9 @@ class ImageLoadThread(QThread):
                             )
 
                         # 获取图片哈希值
-                        image_hash = self.comic_hashes.get(image_filename)
+                        image_hash_hex = self.comic_hashes[index][1]
                         self.image_loaded.emit(
-                            index, image_hash, pixmap, image_filename
+                            index, image_hash_hex, pixmap, image_filename
                         )
 
                 except Exception as e:
@@ -215,15 +216,7 @@ class ImagePreviewWidget(QWidget):
         comic = self.current_comic
         size_str = self._format_file_size(comic.size)
 
-        # 计算重复图片数量
-        duplicate_count = 0
-        if self.current_group and self.current_group.similar_hash_groups:
-            current_comic_hashes = set(comic.image_hashes.values())
-            for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
-                if hash1 in current_comic_hashes or hash2 in current_comic_hashes:
-                    duplicate_count += 1
-
-        info_text = f"大小: {size_str} | 总图片数: {comic.image_count}"
+        info_text = f"大小: {size_str} | 总图片数: {len(comic.image_hashes)}"
         self.info_label.setText(info_text)
 
     def load_preview_images(self):
@@ -260,7 +253,9 @@ class ImagePreviewWidget(QWidget):
             return
 
         # 收集当前漫画相关的重复图片哈希
-        current_comic_hashes = set(self.current_comic.image_hashes.values())
+        current_comic_hashes = set(
+            image_hash[1] for image_hash in self.current_comic.image_hashes
+        )
         target_hashes = []
 
         for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
@@ -278,18 +273,14 @@ class ImagePreviewWidget(QWidget):
 
         # 按漫画原顺序排序
         sorted_image_hashes = sorted(
-            self.current_comic.image_hashes.items(),
+            self.current_comic.image_hashes,
             key=lambda x: natural_sort_key(x[0]),
         )
         indices = []
-        for index, (_image_name, image_hash) in enumerate(sorted_image_hashes):
-            if image_hash in target_hashes:
+        for index, sorted_image_hash in enumerate(sorted_image_hashes):
+            hash_hex = sorted_image_hash[1]
+            if hash_hex in target_hashes:
                 indices.append(index)
-
-        # 构建漫画哈希映射
-        comic_hashes = {}
-        for comic in self.current_group.comics:
-            comic_hashes[comic.path] = comic.image_hashes
 
         # 取前N张图片索引
         image_count = self.image_count_spinbox.value()
@@ -317,7 +308,7 @@ class ImagePreviewWidget(QWidget):
         """加载全部图片"""
         # 计算要加载的图片索引
         image_count = self.image_count_spinbox.value()
-        total_images = self.current_comic.image_count
+        total_images = len(self.current_comic.image_hashes)
 
         if total_images == 0:
             self.status_label.setText("该漫画没有图片")

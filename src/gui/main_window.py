@@ -451,7 +451,7 @@ class MainWindow(QMainWindow):
         # 显示漫画信息
         info_text = f"文件路径: {comic_info.path.replace('/', '\\')}\n"
         info_text += f"文件大小: {comic_info.size / 1024 / 1024:.2f} MB\n"
-        info_text += f"图片数量: {comic_info.image_count}\n"
+        info_text += f"图片数量: {len(comic_info.image_hashes)}\n"
         info_text += f"重复图片数量: {duplicate_count}\n"
         info_text += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic_info.mtime))}\n"
 
@@ -549,7 +549,7 @@ class MainWindow(QMainWindow):
                         for comic in group.comics:
                             f.write(f"  - {comic.path}\n")
                             f.write(f"    大小: {comic.size / 1024 / 1024:.2f} MB\n")
-                            f.write(f"    图片数量: {comic.image_count}\n")
+                            f.write(f"    图片数量: {len(comic.image_hashes)}\n")
 
                         f.write("\n")
 

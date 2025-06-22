@@ -8,7 +8,7 @@ import os
 import time
 import numpy as np
 import imagehash
-from typing import List, Dict, Tuple, Optional
+from typing import List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from loguru import logger
@@ -58,10 +58,7 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
-    image_count: int
-    image_hashes: Dict[
-        str, str
-    ]  # filename -> hash TODO: 改为有序字典，添加哈希数组字段
+    image_hashes: List[Tuple[str, str, np.ndarray]]  # filename, hash_hex, hash_array
     error: Optional[str] = None
 
 
@@ -173,7 +170,7 @@ class Scanner(QObject):
         comic_files = []
         supported_formats = self.config.get_supported_formats()
 
-        for root, dirs, files in os.walk(directory):
+        for root, _dirs, files in os.walk(directory):
             for file in files:
                 if any(file.lower().endswith(fmt) for fmt in supported_formats):
                     comic_files.append(os.path.join(root, file))
@@ -196,11 +193,8 @@ class Scanner(QObject):
             # 处理结果
             for future in as_completed(future_to_file):
                 if self.should_stop:
+                    executor.shutdown(wait=True, cancel_futures=True)
                     break
-
-                # 等待暂停
-                while self.is_paused and not self.should_stop:
-                    time.sleep(0.1)
 
                 file_path = future_to_file[future]
                 try:
@@ -238,17 +232,20 @@ class Scanner(QObject):
                         path=file_path,
                         size=size,
                         mtime=mtime,
-                        image_count=cached_info["image_count"],
                         image_hashes=cached_info["image_hashes"],
                     )
 
             # 处理压缩包
-            image_hashes = {}
+            image_hashes = []
             min_width, min_height = self.config.get_min_image_resolution()
 
             for filename, image_data in self.archive_reader.read_all_images(file_path):
+                # 等待暂停
+                while self.is_paused and not self.should_stop:
+                    time.sleep(0.1)
+
                 if self.should_stop:
-                    break
+                    return None
 
                 # 验证图片
                 if not self.archive_reader.validate_image(image_data):
@@ -263,10 +260,8 @@ class Scanner(QObject):
                 # 计算哈希
                 try:
                     image_hash = self.image_hasher.calculate_hash(image_data)
-
-                    # 检查黑名单
-                    if not self.blacklist_manager.is_blacklisted(image_hash):
-                        image_hashes[filename] = image_hash
+                    hash_array = imagehash.hex_to_hash(image_hash).hash.flatten()
+                    image_hashes.append((filename, image_hash, hash_array))
 
                 except Exception as e:
                     logger.warning(f"计算图片哈希失败 {file_path}/{filename}: {e}")
@@ -276,7 +271,6 @@ class Scanner(QObject):
                 path=file_path,
                 size=size,
                 mtime=mtime,
-                image_count=len(image_hashes),
                 image_hashes=image_hashes,
             )
 
@@ -293,14 +287,7 @@ class Scanner(QObject):
 
         except Exception as e:
             logger.error(f"处理漫画文件失败 {file_path}: {e}")
-            return ComicInfo(
-                path=file_path,
-                size=0,
-                mtime=0,
-                image_count=0,
-                image_hashes={},
-                error=str(e),
-            )
+            return None
 
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
         """检测重复漫画 - 使用numpy优化的高性能实现"""
@@ -340,9 +327,9 @@ class Scanner(QObject):
         blacklist_hashes = self.blacklist_manager.get_all_hashes()
         if blacklist_hashes:
             blacklist_hashes_array = []
-            for hash_str in blacklist_hashes:
+            for hash_hex in blacklist_hashes:
                 # 将哈希字符串转换为numpy数组
-                hash_obj = imagehash.hex_to_hash(hash_str)
+                hash_obj = imagehash.hex_to_hash(hash_hex)
                 hash_array = np.array(hash_obj.hash, dtype=np.uint8)
                 blacklist_hashes_array.append(hash_array.flatten())
             blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
@@ -353,33 +340,25 @@ class Scanner(QObject):
         # 构建全局哈希数组和索引映射
         all_hashes = []
         hash_to_comic_idx = []
-        hash_str_list = []
+        hash_hex_list = []
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
 
         current_idx = 0
         blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
-            for hash_str in comic.image_hashes.values():
-                try:
-                    # 将哈希字符串转换为numpy数组
-                    hash_obj = imagehash.hex_to_hash(hash_str)
-                    hash_array = hash_obj.hash.flatten()
+            for _, hash_hex, hash_array in comic.image_hashes:
+                # 排除黑名单图片哈希
+                if blacklist_hashes is not None:
+                    hamming_distances = np.dot(blacklist_hashes, hash_array)
+                    if np.any(hamming_distances <= similarity_threshold):
+                        blacklist_image_count += 1
+                        continue
 
-                    # 排除黑名单图片哈希
-                    if blacklist_hashes is not None:
-                        hamming_distances = np.dot(blacklist_hashes, hash_array)
-                        if np.any(hamming_distances <= similarity_threshold):
-                            blacklist_image_count += 1
-                            continue
-
-                    all_hashes.append(hash_array)
-                    hash_to_comic_idx.append(comic_idx)
-                    hash_str_list.append(hash_str)
-                    current_idx += 1
-                except Exception as e:
-                    logger.warning(f"解析哈希失败: {hash_str}, 错误: {e}")
-                    continue
+                all_hashes.append(hash_array)
+                hash_to_comic_idx.append(comic_idx)
+                hash_hex_list.append(hash_hex)
+                current_idx += 1
 
             end_idx = current_idx
             if end_idx > start_idx:
@@ -482,8 +461,8 @@ class Scanner(QObject):
                     image_positions = np.nonzero(image_mask)
 
                     for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
-                        hash1 = hash_str_list[start_idx + pos_i]
-                        hash2 = hash_str_list[similar_start_idx + pos_j]
+                        hash1 = hash_hex_list[start_idx + pos_i]
+                        hash2 = hash_hex_list[similar_start_idx + pos_j]
                         similarity = int(
                             hamming_distances[
                                 pos_i, similar_start_idx - end_idx + pos_j

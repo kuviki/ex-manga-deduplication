@@ -148,13 +148,17 @@ class DuplicateListWidget(QWidget):
             for comic in group.comics:
                 # 计算当前漫画的重复图片数量
                 comic_duplicate_count = len(
-                    group_image_hashes.intersection(comic.image_hashes.values())
+                    group_image_hashes.intersection(
+                        hash[1] for hash in comic.image_hashes
+                    )
                 )
 
                 comic_item = QTreeWidgetItem(group_item)
                 comic_item.setText(0, os.path.basename(comic.path))
                 comic_item.setText(1, self._format_file_size(comic.size))
-                comic_item.setText(2, f"{comic.image_count} ({comic_duplicate_count})")
+                comic_item.setText(
+                    2, f"{len(comic.image_hashes)} ({comic_duplicate_count})"
+                )
 
                 # 设置工具提示
                 comic_item.setToolTip(0, comic.path)

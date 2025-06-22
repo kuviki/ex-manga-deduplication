@@ -228,17 +228,6 @@ class BlacklistManager:
             logger.error(f"从黑名单移除图片失败: {e}")
             return False
 
-    def is_blacklisted(self, image_hash: str) -> bool:
-        """检查图片是否在黑名单中
-
-        Args:
-            image_hash: 图片哈希值
-
-        Returns:
-            bool: 是否在黑名单中
-        """
-        return image_hash in self.blacklist_hashes
-
     def get_blacklist_info(self, image_hash: str) -> Dict[str, Any]:
         """获取黑名单图片的详细信息
 
