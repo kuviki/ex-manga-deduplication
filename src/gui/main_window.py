@@ -608,8 +608,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "黑名单统计",
-            f"当前黑名单包含 {stats['total_count']} 个图片\n"
-            f"涉及 {len(stats['archives'])} 个压缩包",
+            f"当前黑名单包含 {stats['total_count']} 个图片",
         )
 
     def show_about(self):
