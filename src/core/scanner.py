@@ -33,6 +33,7 @@ class ScanProgress:
     duplicates_found: int = 0
     errors: int = 0
     elapsed_time: float = 0.0
+    start_time: float = 0.0
 
     @property
     def file_progress(self) -> float:
@@ -93,7 +94,6 @@ class Scanner(QObject):
         self.should_stop = False
 
         self.progress = ScanProgress()
-        self.start_time = 0.0
 
     def scan_directory(self, directory: str) -> None:
         """扫描目录中的漫画文件
@@ -109,7 +109,6 @@ class Scanner(QObject):
             self.is_scanning = True
             self.is_paused = False
             self.should_stop = False
-            self.start_time = time.time()
 
             logger.info(f"开始扫描目录: {directory}")
 
@@ -121,6 +120,7 @@ class Scanner(QObject):
 
             self.progress = ScanProgress(total_files=len(comic_files))
             self.progress_updated.emit(self.progress)
+            self.progress.start_time = time.time()
 
             # 处理漫画文件
             comic_infos = self._process_comic_files(comic_files)
@@ -133,7 +133,7 @@ class Scanner(QObject):
             duplicate_groups = self._detect_duplicates(comic_infos)
 
             self.progress.duplicates_found = len(duplicate_groups)
-            self.progress.elapsed_time = time.time() - self.start_time
+            self.progress.elapsed_time = time.time() - self.progress.start_time
             self.progress_updated.emit(self.progress)
 
             logger.info(f"扫描完成，找到 {len(duplicate_groups)} 组重复漫画")
@@ -207,7 +207,7 @@ class Scanner(QObject):
 
                     self.progress.processed_files += 1
                     self.progress.current_file = os.path.basename(file_path)
-                    self.progress.elapsed_time = time.time() - self.start_time
+                    self.progress.elapsed_time = time.time() - self.progress.start_time
                     self.progress_updated.emit(self.progress)
 
                 except Exception as e:
@@ -314,7 +314,7 @@ class Scanner(QObject):
         for comic in comic_infos:
             if comic.error or not comic.image_hashes:
                 continue
-            
+
             image_count = len(comic.image_hashes)
             # 检查图片数量是否在配置范围内
             if image_count < min_image_count:
@@ -323,9 +323,9 @@ class Scanner(QObject):
             if max_image_count is not None and image_count > max_image_count:
                 filtered_count += 1
                 continue
-                
+
             valid_comics.append(comic)
-        
+
         if filtered_count > 0:
             logger.info(f"根据图片数量范围配置过滤了 {filtered_count} 个漫画文件")
         if len(valid_comics) < 2:
@@ -406,14 +406,14 @@ class Scanner(QObject):
         self.progress.processed_files = 0
         self.progress.duplicates_found = 0
         self.progress.total_files = len(valid_comics)
-        self.start_time = time.time()
+        self.progress.start_time = time.time()
 
         for comic_idx, comic in enumerate(valid_comics):
             # 更新进度
             self.progress.processed_files += 1
             self.progress.duplicates_found = len(duplicate_groups)
             self.progress.current_file = os.path.basename(comic.path)
-            self.progress.elapsed_time = time.time() - self.start_time
+            self.progress.elapsed_time = time.time() - self.progress.start_time
             self.progress_updated.emit(self.progress)
 
             # 等待暂停

@@ -7,6 +7,7 @@
 import os
 import time
 from typing import List
+from datetime import timedelta
 from PyQt5.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -365,13 +366,30 @@ class MainWindow(QMainWindow):
 
         # 更新进度标签
         self.progress_label.setText(
-            f"处理中: {progress.current_file} ({progress.processed_files}/{progress.total_files})"
+            f"处理中 ({progress.processed_files}/{progress.total_files}): {progress.current_file}"
         )
 
-        # 更新状态栏
-        self.status_label.setText(
-            f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复"
-        )
+        # 计算并显示经过时间和预计剩余时间
+        elapsed_time = time.time() - progress.start_time
+        elapsed_str = str(timedelta(seconds=int(elapsed_time)))
+
+        if progress.processed_files > 0:
+            files_per_second = progress.processed_files / elapsed_time
+            remaining_files = progress.total_files - progress.processed_files
+            if files_per_second > 0:
+                remaining_time = remaining_files / files_per_second
+                remaining_str = str(timedelta(seconds=int(remaining_time)))
+                self.status_label.setText(
+                    f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str} | 预计剩余: {remaining_str}"
+                )
+            else:
+                self.status_label.setText(
+                    f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str}"
+                )
+        else:
+            self.status_label.setText(
+                f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str}"
+            )
 
     def on_scan_completed(self, duplicate_groups: List[DuplicateGroup]):
         """处理扫描完成"""
