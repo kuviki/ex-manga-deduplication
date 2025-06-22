@@ -50,7 +50,10 @@ class ConfigManager:
             # 重复检测设置
             "min_similar_images": 3,
             "min_image_resolution": {"width": 100, "height": 100},
-            "comic_image_count_range": {"min": 1, "max": None},  # 参与去重的漫画图片数量范围，max为None表示无限制
+            "comic_image_count_range": {
+                "min": 1,
+                "max": None,
+            },  # 参与去重的漫画图片数量范围，max为None表示无限制
             # 应用程序设置
             "comic_viewer_path": "",
             "error_handling": ErrorHandling.ASK.value,
@@ -73,6 +76,8 @@ class ConfigManager:
             "preview_size": {"width": 200, "height": 200},
             # 黑名单设置
             "blacklist_folder": "blacklist",
+            # 上次扫描目录
+            "last_scanned_directory": "",
         }
 
     def load_config(self) -> None:

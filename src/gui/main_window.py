@@ -60,16 +60,12 @@ class MainWindow(QMainWindow):
         self.current_duplicates = []
 
         self.init_ui()
-        self.connect_signals()
         self.load_settings()
+        self.connect_signals()
 
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle("Ex-漫画去重工具 v1.0.0")
-
-        # 设置窗口大小
-        width, height = self.config.get_window_geometry()
-        self.resize(width, height)
 
         # 创建中央部件
         central_widget = QWidget()
@@ -282,15 +278,24 @@ class MainWindow(QMainWindow):
 
     def load_settings(self):
         """加载设置"""
-        # 这里可以加载一些界面相关的设置
-        pass
+
+        # 加载窗口大小
+        width, height = self.config.get_window_geometry()
+        self.resize(width, height)
+
+        # 加载上次扫描的目录
+        last_dir = self.config.get("last_scanned_directory")
+        if last_dir and os.path.isdir(last_dir):
+            self.dir_label.setText(last_dir)
+            self.dir_label.setStyleSheet("color: black; font-style: normal;")
+            self.scan_btn.setEnabled(True)
 
     def select_directory(self):
         """选择扫描目录"""
         directory = QFileDialog.getExistingDirectory(
             self,
             "选择漫画目录",
-            "",
+            self.config.get("last_scanned_directory", ""),
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
         )
 
@@ -298,6 +303,8 @@ class MainWindow(QMainWindow):
             self.dir_label.setText(directory)
             self.dir_label.setStyleSheet("color: black; font-style: normal;")
             self.scan_btn.setEnabled(True)
+            self.config.set("last_scanned_directory", directory)
+            self.config.save_config()
             logger.info(f"选择扫描目录: {directory}")
 
     def start_scan(self):
