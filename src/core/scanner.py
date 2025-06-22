@@ -34,6 +34,7 @@ class ScanProgress:
     errors: int = 0
     elapsed_time: float = 0.0
     start_time: float = 0.0
+    stage: str = "scanning"  # "scanning" or "processing"
 
     @property
     def file_progress(self) -> float:
@@ -122,14 +123,14 @@ class Scanner(QObject):
             self.progress_updated.emit(self.progress)
             self.progress.start_time = time.time()
 
-            # 处理漫画文件
+            # 扫描漫画文件
             comic_infos = self._process_comic_files(comic_files)
 
             if self.should_stop:
                 logger.info("扫描已停止")
                 return
 
-            # 检测重复
+            # 检测重复漫画
             duplicate_groups = self._detect_duplicates(comic_infos)
 
             self.progress.duplicates_found = len(duplicate_groups)
@@ -403,6 +404,7 @@ class Scanner(QObject):
         )
 
         # 对每个漫画进行重复检测
+        self.progress.stage = "processing"
         self.progress.processed_files = 0
         self.progress.duplicates_found = 0
         self.progress.total_files = len(valid_comics)

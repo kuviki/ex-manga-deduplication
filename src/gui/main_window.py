@@ -184,8 +184,8 @@ class MainWindow(QMainWindow):
         control_layout.addStretch()
 
         # 进度显示区域
-        progress_group = QGroupBox("扫描进度")
-        progress_layout = QVBoxLayout(progress_group)
+        self.progress_group = QGroupBox("扫描进度")
+        progress_layout = QVBoxLayout(self.progress_group)
 
         self.progress_bar = QProgressBar()
         self.progress_label = QLabel("就绪")
@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
         top_row_container = QWidget()
         top_row_container.setLayout(top_row_layout)
         toolbar_layout.addWidget(top_row_container)
-        toolbar_layout.addWidget(progress_group)
+        toolbar_layout.addWidget(self.progress_group)
 
         toolbar_widget = QWidget()
         toolbar_widget.setLayout(toolbar_layout)
@@ -365,13 +365,26 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(int(progress.file_progress))
 
         # 更新进度标签
+        if progress.stage == "scanning":
+            progress_text = "扫描中"
+            self.progress_group.setTitle("扫描进度")
+        else:
+            progress_text = "处理中"
+            self.progress_group.setTitle("处理进度")
         self.progress_label.setText(
-            f"处理中 ({progress.processed_files}/{progress.total_files}): {progress.current_file}"
+            f"{progress_text} ({progress.processed_files}/{progress.total_files}): {progress.current_file}"
         )
 
         # 计算并显示经过时间和预计剩余时间
         elapsed_time = time.time() - progress.start_time
         elapsed_str = str(timedelta(seconds=int(elapsed_time)))
+
+        if progress.stage == "scanning":
+            processed_text = "已扫描"
+            duplicates_text = ""
+        else:
+            processed_text = "已处理"
+            duplicates_text = f"，找到 {progress.duplicates_found} 组重复"
 
         if progress.processed_files > 0:
             files_per_second = progress.processed_files / elapsed_time
@@ -380,15 +393,15 @@ class MainWindow(QMainWindow):
                 remaining_time = remaining_files / files_per_second
                 remaining_str = str(timedelta(seconds=int(remaining_time)))
                 self.status_label.setText(
-                    f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str} | 预计剩余: {remaining_str}"
+                    f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str} | 预计剩余: {remaining_str}"
                 )
             else:
                 self.status_label.setText(
-                    f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str}"
+                    f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str}"
                 )
         else:
             self.status_label.setText(
-                f"已处理 {progress.processed_files} 个文件，找到 {progress.duplicates_found} 组重复 | 耗时: {elapsed_str}"
+                f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str}"
             )
 
     def on_scan_completed(self, duplicate_groups: List[DuplicateGroup]):
