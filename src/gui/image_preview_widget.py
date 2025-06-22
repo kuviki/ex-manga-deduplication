@@ -30,12 +30,21 @@ from ..core.archive_reader import ArchiveReader
 class ImageLoadThread(QThread):
     """图片加载线程"""
 
-    image_loaded = pyqtSignal(int, QPixmap, str)  # index, pixmap, filename
+    image_loaded = pyqtSignal(
+        int, str, QPixmap, str
+    )  # index, image_hash, pixmap, filename
     load_error = pyqtSignal(int, str)  # index, error_message
 
-    def __init__(self, comic_path: str, image_indices: List[int], max_size: tuple):
+    def __init__(
+        self,
+        comic_path: str,
+        comic_hashes: Dict[str, str],
+        image_indices: List[int],
+        max_size: tuple,
+    ):
         super().__init__()
         self.comic_path = comic_path
+        self.comic_hashes = comic_hashes
         self.image_indices = image_indices
         self.max_size = max_size
         self._stop_requested = False
@@ -83,7 +92,11 @@ class ImageLoadThread(QThread):
                                 Qt.SmoothTransformation,
                             )
 
-                        self.image_loaded.emit(index, pixmap, image_filename)
+                        # 获取图片哈希值
+                        image_hash = self.comic_hashes.get(image_filename)
+                        self.image_loaded.emit(
+                            index, image_hash, pixmap, image_filename
+                        )
 
                 except Exception as e:
                     logger.error(f"加载图片 {index} 失败: {e}")
@@ -91,87 +104,6 @@ class ImageLoadThread(QThread):
 
         except Exception as e:
             logger.error(f"加载漫画图片失败: {e}")
-
-    def stop(self):
-        """停止加载"""
-        self._stop_requested = True
-
-
-class DuplicateImageLoadThread(QThread):
-    """重复图片加载线程"""
-
-    image_loaded = pyqtSignal(
-        str, QPixmap, str, str
-    )  # hash, pixmap, filename, comic_path
-    load_error = pyqtSignal(str, str)  # hash, error_message
-
-    def __init__(
-        self,
-        comic_hashes: Dict[str, Dict[str, str]],
-        target_hashes: List[str],
-        max_size: tuple,
-    ):
-        super().__init__()
-        self.comic_hashes = comic_hashes  # {comic_path: {filename: hash}}
-        self.target_hashes = target_hashes  # 要加载的哈希列表
-        self.max_size = max_size
-        self._stop_requested = False
-
-    def run(self):
-        """运行重复图片加载"""
-        try:
-            archive_reader = ArchiveReader()
-
-            for target_hash in self.target_hashes:
-                if self._stop_requested:
-                    break
-
-                # 查找包含此哈希的漫画和文件名
-                found = False
-                for comic_path, hash_dict in self.comic_hashes.items():
-                    for filename, file_hash in hash_dict.items():
-                        if file_hash == target_hash:
-                            try:
-                                # 读取图片数据
-                                image_data = archive_reader.read_image(
-                                    comic_path, filename
-                                )
-                                if not image_data:
-                                    continue
-
-                                # 创建QPixmap
-                                pixmap = QPixmap()
-                                if pixmap.loadFromData(image_data):
-                                    # 缩放图片
-                                    if self.max_size:
-                                        pixmap = pixmap.scaled(
-                                            self.max_size[0],
-                                            self.max_size[1],
-                                            Qt.KeepAspectRatio,
-                                            Qt.SmoothTransformation,
-                                        )
-
-                                    self.image_loaded.emit(
-                                        target_hash, pixmap, filename, comic_path
-                                    )
-                                    found = True
-                                    break
-
-                            except Exception as e:
-                                logger.error(
-                                    f"加载重复图片失败 {comic_path}/{filename}: {e}"
-                                )
-                                self.load_error.emit(target_hash, str(e))
-                                continue
-
-                    if found:
-                        break
-
-                if not found:
-                    self.load_error.emit(target_hash, "未找到对应的图片文件")
-
-        except Exception as e:
-            logger.error(f"加载重复图片失败: {e}")
 
     def stop(self):
         """停止加载"""
@@ -227,6 +159,7 @@ class ImagePreviewWidget(QWidget):
         control_layout.addWidget(QLabel("显示图片数:"))
 
         self.image_count_spinbox = QSpinBox()
+        self.image_count_spinbox.setEnabled(False)
         self.image_count_spinbox.setMinimum(1)
         self.image_count_spinbox.setMaximum(20)
         self.image_count_spinbox.setValue(6)
@@ -350,10 +283,10 @@ class ImagePreviewWidget(QWidget):
             self.current_comic.image_hashes.items(),
             key=lambda x: natural_sort_key(x[0]),
         )
-        sorted_target_hashes = []
-        for _image_name, image_hash in sorted_image_hashes:
+        indices = []
+        for index, (_image_name, image_hash) in enumerate(sorted_image_hashes):
             if image_hash in target_hashes:
-                sorted_target_hashes.append(image_hash)
+                indices.append(index)
 
         # 构建漫画哈希映射
         comic_hashes = {}
@@ -361,15 +294,18 @@ class ImagePreviewWidget(QWidget):
             comic_hashes[comic.path] = comic.image_hashes
 
         # 创建重复图片加载线程
-        self.load_thread = DuplicateImageLoadThread(
-            comic_hashes, sorted_target_hashes, preview_size
+        self.load_thread = ImageLoadThread(
+            self.current_comic.path,
+            self.current_comic.image_hashes,
+            indices,
+            preview_size,
         )
-        self.load_thread.image_loaded.connect(self.on_duplicate_image_loaded)
-        self.load_thread.load_error.connect(self.on_duplicate_image_load_error)
+        self.load_thread.image_loaded.connect(self.on_image_loaded)
+        self.load_thread.load_error.connect(self.on_image_load_error)
         self.load_thread.finished.connect(self.on_load_finished)
 
         # 显示加载状态
-        self.status_label.setText(f"正在加载 {len(sorted_target_hashes)} 张重复图片...")
+        self.status_label.setText(f"正在加载 {len(indices)} 张重复图片...")
 
         # 开始加载
         self.load_thread.start()
@@ -393,7 +329,10 @@ class ImagePreviewWidget(QWidget):
 
         # 创建加载线程
         self.load_thread = ImageLoadThread(
-            self.current_comic.path, indices, preview_size
+            self.current_comic.path,
+            self.current_comic.image_hashes,
+            indices,
+            preview_size,
         )
         self.load_thread.image_loaded.connect(self.on_image_loaded)
         self.load_thread.load_error.connect(self.on_image_load_error)
@@ -405,17 +344,12 @@ class ImagePreviewWidget(QWidget):
         # 开始加载
         self.load_thread.start()
 
-    def on_image_loaded(self, index: int, pixmap: QPixmap, filename: str):
+    def on_image_loaded(
+        self, index: int, image_hash: str, pixmap: QPixmap, filename: str
+    ):
         """处理图片加载完成"""
         self.image_pixmaps[index] = pixmap
-        self.add_image_to_display(index, pixmap, filename)
-
-    def on_duplicate_image_loaded(
-        self, image_hash: str, pixmap: QPixmap, filename: str, comic_path: str
-    ):
-        """处理重复图片加载完成"""
-        self.image_pixmaps[image_hash] = pixmap
-        self.add_duplicate_image_to_display(image_hash, pixmap, filename, comic_path)
+        self.add_image_to_display(index, image_hash, pixmap, filename)
 
     def on_duplicate_image_load_error(self, image_hash: str, error_message: str):
         """处理重复图片加载错误"""
@@ -433,7 +367,9 @@ class ImagePreviewWidget(QWidget):
         self.status_label.setText(f"已加载 {loaded_count} 张图片")
         self.load_finished = True
 
-    def add_image_to_display(self, index: int, pixmap: QPixmap, filename: str):
+    def add_image_to_display(
+        self, index: int, image_hash: str, pixmap: QPixmap, filename: str
+    ):
         """添加图片到显示区域"""
         # 创建图片框架
         frame = QFrame()
@@ -449,11 +385,10 @@ class ImagePreviewWidget(QWidget):
         image_label.setAlignment(Qt.AlignCenter)
         image_label.setScaledContents(False)
 
-        # 图片信息
-        info_text = (
-            f"图片 {index + 1}: {filename}\n({pixmap.width()}x{pixmap.height()})"
-        )
+        # 图片信息 （可选择复制）
+        info_text = f"图片名称: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
+        info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setStyleSheet("font-size: 10px; color: gray;")
 
@@ -475,41 +410,6 @@ class ImagePreviewWidget(QWidget):
 
         # 存储索引信息
         frame.image_index = index
-
-    def add_duplicate_image_to_display(
-        self, image_hash: str, pixmap: QPixmap, filename: str, comic_path: str
-    ):
-        """添加重复图片到显示区域"""
-        # 创建图片框架
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Box)
-        frame.setLineWidth(2)  # 重复图片使用更粗的边框
-        frame.setStyleSheet("border-color: #ff9800;")  # 橙色边框表示重复图片
-
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(5, 5, 5, 5)
-
-        # 图片标签
-        image_label = QLabel()
-        image_label.setPixmap(pixmap)
-        image_label.setAlignment(Qt.AlignCenter)
-        image_label.setScaledContents(False)
-
-        # 图片信息 （可选择复制）
-        info_text = f"图片名称: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
-        info_label = QLabel(info_text)
-        info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        info_label.setAlignment(Qt.AlignCenter)
-        info_label.setStyleSheet("font-size: 10px; color: #ff9800; font-weight: bold;")
-
-        frame_layout.addWidget(image_label)
-        frame_layout.addWidget(info_label)
-
-        # 直接添加到末尾
-        self.image_layout.addWidget(frame)
-
-        # 存储哈希信息
-        frame.image_hash = image_hash
 
     def add_error_placeholder(self, index: int, error_message: str):
         """添加错误占位符"""
