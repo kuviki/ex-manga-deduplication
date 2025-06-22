@@ -60,6 +60,7 @@ class ComicInfo:
     mtime: float
     image_hashes: List[Tuple[str, str, np.ndarray]]  # filename, hash_hex, hash_array
     error: Optional[str] = None
+    checked: bool = False  # 新增：是否已检查标记
 
 
 @dataclass

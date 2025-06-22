@@ -6,7 +6,7 @@
 
 import os
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any, Optional
 from loguru import logger
 from enum import Enum
 
@@ -78,6 +78,8 @@ class ConfigManager:
             "blacklist_folder": "blacklist",
             # 上次扫描目录
             "last_scanned_directory": "",
+            # 已检查漫画路径
+            "checked_comic_paths": [],
         }
 
     def load_config(self) -> None:
@@ -201,6 +203,14 @@ class ConfigManager:
         """获取预览图片大小"""
         size = self.get("preview_size", {"width": 200, "height": 200})
         return size.get("width", 200), size.get("height", 200)
+
+    def get_checked_comic_paths(self) -> List[str]:
+        """获取已检查漫画路径列表"""
+        return self.get("checked_comic_paths", [])
+
+    def set_checked_comic_paths(self, paths: List[str]):
+        """设置已检查漫画路径列表"""
+        self.set("checked_comic_paths", paths)
 
     def get_blacklist_folder(self) -> str:
         """获取黑名单文件路径"""

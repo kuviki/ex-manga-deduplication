@@ -6,7 +6,7 @@
 
 import os
 import subprocess
-from typing import List
+from typing import List, Optional
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -38,6 +38,9 @@ class DuplicateListWidget(QWidget):
         super().__init__(parent)
         self.config = config_manager
         self.duplicate_groups = []
+        self._checked_comic_paths = set(
+            self.config.get_checked_comic_paths()
+        )  # 加载已检查的漫画路径
         self.init_ui()
 
     def init_ui(self):
@@ -179,6 +182,18 @@ class DuplicateListWidget(QWidget):
                 comic_item.setFlags(comic_item.flags() | Qt.ItemIsUserCheckable)
                 comic_item.setCheckState(0, Qt.Unchecked)
 
+                # 根据 checked 状态设置背景色
+                if comic.path in self._checked_comic_paths:
+                    comic_item.setBackground(
+                        0, QBrush(QColor(220, 255, 220))
+                    )  # 浅绿色背景
+                    comic.checked = True
+                else:
+                    comic_item.setBackground(
+                        0, QBrush(QColor(255, 255, 255))
+                    )  # 白色背景
+                    comic.checked = False
+
                 total_comics += 1
 
             # 展开组节点
@@ -200,6 +215,8 @@ class DuplicateListWidget(QWidget):
             self.comic_selected.emit(
                 data["comic"], data["group"], data["duplicate_count"]
             )
+            # # 切换已检查状态
+            # self._update_comic_checked_state(item, data["comic"])
 
     def show_context_menu(self, position):
         """显示右键菜单"""
@@ -234,6 +251,20 @@ class DuplicateListWidget(QWidget):
         open_default_action.triggered.connect(
             lambda: self.open_with_default(comic.path)
         )
+
+        menu.addSeparator()
+
+        # 标记为已检查/取消标记
+        if comic.checked:
+            uncheck_mark_action = menu.addAction("取消标记")
+            uncheck_mark_action.triggered.connect(
+                lambda: self._update_comic_checked_state(item, comic, False)
+            )
+        else:
+            check_mark_action = menu.addAction("标记为已检查")
+            check_mark_action.triggered.connect(
+                lambda: self._update_comic_checked_state(item, comic, True)
+            )
 
         menu.addSeparator()
 
@@ -388,6 +419,27 @@ class DuplicateListWidget(QWidget):
                         selected_paths.append(data["comic"].path)
 
         return selected_paths
+
+    def _update_comic_checked_state(
+        self, item: QTreeWidgetItem, comic: object, checked: Optional[bool] = None
+    ):
+        """更新漫画的已检查状态并持久化"""
+        if checked is None:
+            # 如果未指定checked状态，则切换当前状态
+            comic.checked = not comic.checked
+        else:
+            comic.checked = checked
+
+        if comic.checked:
+            self._checked_comic_paths.add(comic.path)
+            item.setBackground(0, QBrush(QColor(220, 255, 220)))  # 浅绿色背景
+        else:
+            self._checked_comic_paths.discard(comic.path)
+            item.setBackground(0, QBrush(QColor(255, 255, 255)))  # 白色背景
+
+        # 持久化已检查的漫画路径
+        self.config.set_checked_comic_paths(list(self._checked_comic_paths))
+        self.config.save_config()
 
     def _format_file_size(self, size_bytes: int) -> str:
         """格式化文件大小"""
