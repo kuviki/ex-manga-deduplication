@@ -494,14 +494,13 @@ class MainWindow(QMainWindow):
             deleted_comic_paths = []
             for comic_path in comic_paths:
                 try:
-                    comic_path = comic_path.replace("/", "\\")
-                    send2trash(comic_path)
+                    send2trash(comic_path.replace("/", "\\"))
                     success_count += 1
                     logger.info(f"已删除漫画: {comic_path}")
+                    deleted_comic_paths.append(comic_path)
                 except Exception as e:
                     error_count += 1
                     logger.error(f"删除漫画失败 {comic_path}: {e}")
-                    deleted_comic_paths.append(comic_path)
 
             # 显示结果
             if error_count == 0:
