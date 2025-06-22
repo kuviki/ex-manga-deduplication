@@ -155,13 +155,11 @@ class ImagePreviewWidget(QWidget):
 
         control_layout.addStretch()
 
-        # 图片数量控制（仅在显示全部图片时有效）
-        control_layout.addWidget(QLabel("显示图片数:"))
+        # 图片数量控制（0表示无限制）
+        control_layout.addWidget(QLabel("显示图片数 (0表示无限制):"))
 
         self.image_count_spinbox = QSpinBox()
-        self.image_count_spinbox.setEnabled(False)
-        self.image_count_spinbox.setMinimum(1)
-        self.image_count_spinbox.setMaximum(20)
+        self.image_count_spinbox.setRange(0, 2147483647)
         self.image_count_spinbox.setValue(6)
         self.image_count_spinbox.valueChanged.connect(self.on_image_count_changed)
         control_layout.addWidget(self.image_count_spinbox)
@@ -293,6 +291,11 @@ class ImagePreviewWidget(QWidget):
         for comic in self.current_group.comics:
             comic_hashes[comic.path] = comic.image_hashes
 
+        # 取前N张图片索引
+        image_count = self.image_count_spinbox.value()
+        if image_count > 0:
+            indices = indices[:image_count]
+
         # 创建重复图片加载线程
         self.load_thread = ImageLoadThread(
             self.current_comic.path,
@@ -321,7 +324,7 @@ class ImagePreviewWidget(QWidget):
             return
 
         # 均匀分布选择图片索引
-        if image_count >= total_images:
+        if image_count == 0 or image_count >= total_images:
             indices = list(range(total_images))
         else:
             step = total_images / image_count
@@ -486,9 +489,6 @@ class ImagePreviewWidget(QWidget):
     def on_display_mode_changed(self, checked: bool):
         """显示模式改变时的处理"""
         self.show_duplicates_only = checked
-
-        # 更新图片数量控件的可用性
-        self.image_count_spinbox.setEnabled(not checked)
 
         # 重新加载图片
         if self.current_comic and self.current_group:
