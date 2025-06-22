@@ -495,9 +495,10 @@ class ImagePreviewWidget(QWidget):
         image_label.setAlignment(Qt.AlignCenter)
         image_label.setScaledContents(False)
 
-        # 图片信息
-        info_text = f"重复图片: {filename}\n({pixmap.width()}x{pixmap.height()})"
+        # 图片信息 （可选择复制）
+        info_text = f"图片名称: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
+        info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setStyleSheet("font-size: 10px; color: #ff9800; font-weight: bold;")
 
