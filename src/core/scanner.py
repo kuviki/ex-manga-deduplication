@@ -340,25 +340,30 @@ class Scanner(QObject):
         # 构建全局哈希数组和索引映射
         all_hashes = []
         hash_to_comic_idx = []
-        hash_hex_list = []
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
 
         current_idx = 0
         blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
-            for _, hash_hex, hash_array in comic.image_hashes:
-                # 排除黑名单图片哈希
-                if blacklist_hashes is not None:
-                    hamming_distances = np.dot(blacklist_hashes, hash_array)
-                    if np.any(hamming_distances <= similarity_threshold):
-                        blacklist_image_count += 1
-                        continue
+            # 批量处理图片哈希
+            hash_arrays = np.array([h[2] for h in comic.image_hashes])
 
-                all_hashes.append(hash_array)
-                hash_to_comic_idx.append(comic_idx)
-                hash_hex_list.append(hash_hex)
-                current_idx += 1
+            # 批量计算黑名单距离
+            if blacklist_hashes is not None:
+                hamming_distances = np.dot(blacklist_hashes, hash_arrays.T)
+                blacklist_mask = np.any(
+                    hamming_distances <= similarity_threshold, axis=0
+                )
+                blacklist_image_count += np.sum(blacklist_mask)
+                # 过滤掉黑名单图片
+                hash_arrays = hash_arrays[~blacklist_mask]
+
+            # 批量添加有效哈希
+            if len(hash_arrays) > 0:
+                all_hashes.extend(hash_arrays)
+                hash_to_comic_idx.extend([comic_idx] * len(hash_arrays))
+                current_idx += len(hash_arrays)
 
             end_idx = current_idx
             if end_idx > start_idx:
@@ -373,13 +378,11 @@ class Scanner(QObject):
         )
 
         # 转换为numpy矩阵
-        all_hashes_matrix = np.array(all_hashes)  # shape: (total_images, hash_bits)
-        all_hashes_matrix_inv = ~all_hashes_matrix
+        all_hashes = np.array(all_hashes)  # shape: (total_images, hash_bits)
+        all_hashes_inv = ~all_hashes
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
 
-        logger.info(
-            f"构建了 {all_hashes_matrix.shape[0]} x {all_hashes_matrix.shape[1]} 的哈希矩阵"
-        )
+        logger.info(f"构建了 {all_hashes.shape[0]} x {all_hashes.shape[1]} 的哈希矩阵")
 
         # 对每个漫画进行重复检测
         self.progress.stage = "processing"
@@ -411,15 +414,15 @@ class Scanner(QObject):
                 continue
 
             start_idx, end_idx = comic_hash_ranges[comic_idx]
-            comic_hashes = all_hashes_matrix[start_idx:end_idx].astype(
+            comic_hashes = all_hashes[start_idx:end_idx].astype(
                 np.uint8
             )  # 当前漫画的哈希矩阵
 
             # 计算当前漫画图片与后续图片的汉明距离矩阵
-            sub_hashes_matrix_inv = all_hashes_matrix_inv[end_idx:]
-            sub_hashes_matrix = all_hashes_matrix[end_idx:]
-            hamming_distances = np.dot(comic_hashes, sub_hashes_matrix_inv.T) + np.dot(
-                1 - comic_hashes, sub_hashes_matrix.T
+            sub_hashes = all_hashes[end_idx:]
+            sub_hashes_inv = all_hashes_inv[end_idx:]
+            hamming_distances = np.dot(comic_hashes, sub_hashes_inv.T) + np.dot(
+                1 - comic_hashes, sub_hashes.T
             )  # shape: (comic_images, all_images)
 
             # 应用相似度阈值
@@ -461,8 +464,10 @@ class Scanner(QObject):
                     image_positions = np.nonzero(image_mask)
 
                     for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
-                        hash1 = hash_hex_list[start_idx + pos_i]
-                        hash2 = hash_hex_list[similar_start_idx + pos_j]
+                        hash1 = all_hashes[start_idx + pos_i]
+                        hash1 = str(imagehash.ImageHash(hash1))
+                        hash2 = all_hashes[similar_start_idx + pos_j]
+                        hash2 = str(imagehash.ImageHash(hash2))
                         similarity = int(
                             hamming_distances[
                                 pos_i, similar_start_idx - end_idx + pos_j
