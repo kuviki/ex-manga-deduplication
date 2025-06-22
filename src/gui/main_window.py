@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
     ):
         """处理漫画选择"""
         # 显示漫画信息
-        info_text = f"文件路径: {comic_info.path}\n"
+        info_text = f"文件路径: {comic_info.path.replace('/', '\\')}\n"
         info_text += f"文件大小: {comic_info.size / 1024 / 1024:.2f} MB\n"
         info_text += f"图片数量: {comic_info.image_count}\n"
         info_text += f"重复图片数量: {duplicate_count}\n"
