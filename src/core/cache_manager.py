@@ -28,7 +28,7 @@ class CacheManager:
         except Exception as e:
             logger.error(f"创建缓存目录失败: {e}")
 
-    def _get_cache_key(
+    def get_cache_key(
         self, file_path: str, mtime: float, algorithm: HashAlgorithm
     ) -> str:
         """生成缓存键
@@ -63,7 +63,7 @@ class CacheManager:
             Optional[Dict]: 缓存数据，如果不存在则返回None
         """
         try:
-            cache_key = self._get_cache_key(file_path, mtime, algorithm)
+            cache_key = self.get_cache_key(file_path, mtime, algorithm)
 
             # 先检查内存缓存
             if cache_key in self._memory_cache:
@@ -112,7 +112,7 @@ class CacheManager:
             bool: 是否成功设置缓存
         """
         try:
-            cache_key = self._get_cache_key(file_path, mtime, algorithm)
+            cache_key = self.get_cache_key(file_path, mtime, algorithm)
 
             # 准备缓存数据
             cache_data = {

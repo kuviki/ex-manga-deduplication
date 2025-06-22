@@ -60,7 +60,8 @@ class ComicInfo:
     mtime: float
     image_hashes: List[Tuple[str, str, np.ndarray]]  # filename, hash_hex, hash_array
     error: Optional[str] = None
-    checked: bool = False  # 新增：是否已检查标记
+    checked: bool = False  # 是否已检查标记
+    cache_key: str  # 缓存键
 
 
 @dataclass
@@ -234,6 +235,9 @@ class Scanner(QObject):
                         size=size,
                         mtime=mtime,
                         image_hashes=cached_info["image_hashes"],
+                        cache_key=self.cache_manager.get_cache_key(
+                            file_path, mtime, self.config.get_hash_algorithm()
+                        ),
                     )
 
             # 处理压缩包
@@ -273,6 +277,9 @@ class Scanner(QObject):
                 size=size,
                 mtime=mtime,
                 image_hashes=image_hashes,
+                cache_key=self.cache_manager.get_cache_key(
+                    file_path, mtime, self.config.get_hash_algorithm()
+                ),
             )
 
             # 保存到缓存
