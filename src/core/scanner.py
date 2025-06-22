@@ -29,13 +29,14 @@ class ScanProgress:
     current_file: str = ""
     processed_files: int = 0
     total_files: int = 0
-    current_images: int = 0
-    total_images: int = 0
     duplicates_found: int = 0
     errors: int = 0
     elapsed_time: float = 0.0
     start_time: float = 0.0
     stage: str = "scanning"  # "scanning" or "processing"
+    history: Optional[List[List[Tuple[float, int]]]] = (
+        None  # 用于存储 (timestamp, processed_files) 对
+    )
 
     @property
     def file_progress(self) -> float:
@@ -43,13 +44,6 @@ class ScanProgress:
         if self.total_files == 0:
             return 0.0
         return (self.processed_files / self.total_files) * 100
-
-    @property
-    def image_progress(self) -> float:
-        """图片处理进度百分比"""
-        if self.total_images == 0:
-            return 0.0
-        return (self.current_images / self.total_images) * 100
 
 
 @dataclass
@@ -407,6 +401,7 @@ class Scanner(QObject):
         self.progress.duplicates_found = 0
         self.progress.total_files = len(valid_comics)
         self.progress.start_time = time.time()
+        self.progress.history = []
 
         for comic_idx, comic in enumerate(valid_comics):
             # 更新进度
