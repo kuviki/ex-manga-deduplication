@@ -54,9 +54,9 @@ class ComicInfo:
     size: int
     mtime: float
     image_hashes: List[Tuple[str, str, np.ndarray]]  # filename, hash_hex, hash_array
+    cache_key: str  # 缓存键
     error: Optional[str] = None
     checked: bool = False  # 是否已检查标记
-    cache_key: str  # 缓存键
 
 
 @dataclass
@@ -153,14 +153,20 @@ class Scanner(QObject):
         """恢复扫描"""
         if self.is_scanning and self.is_paused:
             self.is_paused = False
-            logger.info("扫描已恢复")
+            if self.progress.stage == "scanning":
+                logger.info("扫描已恢复")
+            elif self.progress.stage == "processing":
+                logger.info("处理已恢复")
             self.scan_resumed.emit()
 
     def stop_scan(self) -> None:
         """停止扫描"""
         if self.is_scanning:
             self.should_stop = True
-            logger.info("正在停止扫描...")
+            if self.progress.stage == "scanning":
+                logger.info("正在停止扫描...")
+            elif self.progress.stage == "processing":
+                logger.info("正在停止处理...")
 
     def _find_comic_files(self, directory: str) -> List[str]:
         """查找目录中的所有漫画文件"""
@@ -209,6 +215,20 @@ class Scanner(QObject):
                     self.progress.errors += 1
 
         return comic_infos
+
+    def _persist_cache_keys(
+        self, similar_comic_cache_keys: set, skipped_comic_cache_keys: set
+    ):
+        """持久化缓存键"""
+        try:
+            with open("index.db", "wb") as f:
+                pickle.dump(
+                    (similar_comic_cache_keys, skipped_comic_cache_keys),
+                    f,
+                    protocol=pickle.HIGHEST_PROTOCOL,
+                )
+        except Exception as e:
+            logger.error(f"更新缓存 index.db 失败: {e}")
 
     def _process_single_comic(self, file_path: str) -> Optional[ComicInfo]:
         """处理单个漫画文件"""
@@ -301,6 +321,9 @@ class Scanner(QObject):
         try:
             with open("index.db", "rb") as f:
                 similar_comic_cache_keys, skipped_comic_cache_keys = pickle.load(f)
+            skipped_comic_cache_keys = (
+                skipped_comic_cache_keys - similar_comic_cache_keys
+            )
         except Exception:
             similar_comic_cache_keys = set()
             skipped_comic_cache_keys = set()
@@ -331,6 +354,16 @@ class Scanner(QObject):
             logger.info(f"根据图片数量范围配置过滤了 {filtered_count} 个漫画文件")
         if len(valid_comics) < 2:
             return duplicate_groups
+
+        # 对 valid_comics 进行排序
+        if similar_comic_cache_keys or skipped_comic_cache_keys:
+            valid_comics.sort(
+                key=lambda x: 0
+                if x.cache_key in similar_comic_cache_keys
+                else 2
+                if x.cache_key in skipped_comic_cache_keys
+                else 1
+            )
 
         logger.info(f"开始使用numpy优化算法检测 {len(valid_comics)} 个漫画的重复")
 
@@ -385,7 +418,7 @@ class Scanner(QObject):
             return duplicate_groups
 
         logger.info(
-            f"成功解析 {len(all_hashes)} 个图片哈希，其中 {blacklist_image_count} 个被排除在黑名单内"
+            f"成功构建了 {len(all_hashes)} 个图片哈希，其中 {blacklist_image_count} 个被排除在黑名单内"
         )
 
         # 转换为numpy矩阵
@@ -393,17 +426,30 @@ class Scanner(QObject):
         all_hashes_inv = ~all_hashes
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
 
-        logger.info(f"构建了 {all_hashes.shape[0]} x {all_hashes.shape[1]} 的哈希矩阵")
+        # 计算跳过的漫画数量并更新总文件数
+        skipped_count = sum(
+            1 for comic in valid_comics if comic.cache_key in skipped_comic_cache_keys
+        )
+        remaining_count = len(valid_comics) - skipped_count
+        logger.info(
+            f"已跳过 {skipped_count} 个漫画文件，开始处理剩余 {remaining_count} 个"
+        )
 
-        # 对每个漫画进行重复检测
+        # 进度条更新
         self.progress.stage = "processing"
-        self.progress.processed_files = 0
+        self.progress.processed_files = skipped_count
         self.progress.duplicates_found = 0
         self.progress.total_files = len(valid_comics)
         self.progress.start_time = time.time()
         self.progress.history = []
 
+        # 对每个漫画进行重复检测
         for comic_idx, comic in enumerate(valid_comics):
+            # 如果之后的漫画已跳过，则停止处理
+            if comic.cache_key in skipped_comic_cache_keys:
+                logger.info("遇到已跳过的漫画，提前结束重复检测")
+                break
+
             # 更新进度
             self.progress.processed_files += 1
             self.progress.duplicates_found = len(duplicate_groups)
@@ -416,7 +462,7 @@ class Scanner(QObject):
                 time.sleep(0.1)
 
             if self.should_stop:
-                logger.info("检测已停止")
+                logger.info("处理已停止")
                 break
 
             skipped_comic_cache_keys.add(comic.cache_key)
@@ -503,16 +549,11 @@ class Scanner(QObject):
                 similar_comic_cache_keys.update(
                     comic.cache_key for comic in similar_comics
                 )
-                try:
-                    with open("index.db", "wb") as f:
-                        pickle.dump(
-                            (similar_comic_cache_keys, skipped_comic_cache_keys),
-                            f,
-                            protocol=pickle.HIGHEST_PROTOCOL,
-                        )
-                except Exception as e:
-                    logger.error(f"更新缓存 index.db 失败: {e}")
+                self._persist_cache_keys(
+                    similar_comic_cache_keys, skipped_comic_cache_keys
+                )
 
+        self._persist_cache_keys(similar_comic_cache_keys, skipped_comic_cache_keys)
         return duplicate_groups
 
     # _compare_comics方法已被numpy优化的_detect_duplicates方法替代，不再需要
