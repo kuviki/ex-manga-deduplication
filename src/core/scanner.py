@@ -59,7 +59,7 @@ class ComicInfo:
     size: int
     mtime: float
     image_count: int
-    image_hashes: Dict[str, str]  # filename -> hash
+    image_hashes: Dict[str, str]  # filename -> hash TODO: 改为有序字典
     error: Optional[str] = None
 
 
@@ -68,7 +68,7 @@ class DuplicateGroup:
     """重复漫画组"""
 
     comics: List[ComicInfo]
-    similar_images: List[Tuple[str, str, int]]  # (hash1, hash2, similarity)
+    similar_hash_groups: List[Tuple[str, str, int]]  # (hash1, hash2, similarity)
     similarity_count: int
 
 
@@ -303,14 +303,14 @@ class Scanner(QObject):
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
         """检测重复漫画 - 使用numpy优化的高性能实现"""
         duplicate_groups = []
-        processed_comics = set()
+        processed_comic_indices = set()
 
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
         min_image_count, max_image_count = self.config.get_comic_image_count_range()
 
         # 过滤有效的漫画（包括图片数量范围过滤）
-        valid_comics = []
+        valid_comics: List[ComicInfo] = []
         filtered_count = 0
         for comic in comic_infos:
             if comic.error or not comic.image_hashes:
@@ -351,6 +351,7 @@ class Scanner(QObject):
         # 构建全局哈希数组和索引映射
         all_hashes = []
         hash_to_comic_idx = []
+        hash_str_list = []
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
 
         current_idx = 0
@@ -373,6 +374,7 @@ class Scanner(QObject):
 
                     all_hashes.append(hash_array.flatten())
                     hash_to_comic_idx.append(comic_idx)
+                    hash_str_list.append(hash_str)
                     current_idx += 1
                 except Exception as e:
                     logger.warning(f"解析哈希失败: {hash_str}, 错误: {e}")
@@ -426,7 +428,7 @@ class Scanner(QObject):
                 logger.info("检测已停止")
                 break
 
-            if comic.path in processed_comics:
+            if comic_idx in processed_comic_indices:
                 continue
 
             if comic_idx not in comic_hash_ranges:
@@ -455,47 +457,50 @@ class Scanner(QObject):
             # 找到满足最小相似图片数量要求的漫画
             valid_similar_comics = unique_comics[counts >= min_similar_images]
 
-            # # 排除自己
-            # valid_similar_comics = valid_similar_comics[valid_similar_comics != comic_idx]
+            # 去除已经处理过的漫画
+            valid_similar_comics = [
+                int(idx)
+                for idx in valid_similar_comics
+                if idx not in processed_comic_indices
+            ]
 
             if len(valid_similar_comics) > 0:
                 # 构建重复组
                 similar_comics = [comic]
-                all_similar_images = []
+                all_similar_groups = []
 
                 for similar_comic_idx in valid_similar_comics:
                     similar_comic = valid_comics[similar_comic_idx]
-                    if similar_comic.path not in processed_comics:
-                        similar_comics.append(similar_comic)
+                    similar_comics.append(similar_comic)
 
-                        # 收集相似图片信息
-                        comic_mask = similarity_mask & (
-                            hash_to_comic_idx[end_idx:][np.newaxis, :]
-                            == similar_comic_idx
-                        )
-                        comic_positions = np.nonzero(comic_mask)
+                    # 收集相似图片的位置信息
+                    similar_start_idx, similar_end_idx = comic_hash_ranges[
+                        similar_comic_idx
+                    ]
+                    image_mask = similarity_mask[
+                        :, similar_start_idx - end_idx : similar_end_idx - end_idx
+                    ]
+                    image_positions = np.nonzero(image_mask)
 
-                        for pos_i, pos_j in zip(comic_positions[0], comic_positions[1]):
-                            hash1 = list(comic.image_hashes.values())[pos_i]
-                            hash2 = list(similar_comic.image_hashes.values())[
-                                pos_j
-                                + end_idx
-                                - comic_hash_ranges[similar_comic_idx][0]
+                    for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
+                        hash1 = hash_str_list[start_idx + pos_i]
+                        hash2 = hash_str_list[similar_start_idx + pos_j]
+                        similarity = int(
+                            hamming_distances[
+                                pos_i, similar_start_idx - end_idx + pos_j
                             ]
-                            similarity = int(hamming_distances[pos_i, pos_j])
-                            all_similar_images.append((hash1, hash2, similarity))
+                        )
+                        all_similar_groups.append((hash1, hash2, similarity))
 
-                if len(similar_comics) > 1:
-                    duplicate_group = DuplicateGroup(
-                        comics=similar_comics,
-                        similar_images=all_similar_images,
-                        similarity_count=len(all_similar_images),
-                    )
-                    duplicate_groups.append(duplicate_group)
+                duplicate_group = DuplicateGroup(
+                    comics=similar_comics,
+                    similar_hash_groups=all_similar_groups,
+                    similarity_count=len(all_similar_groups),
+                )
+                duplicate_groups.append(duplicate_group)
 
-                    # 标记已处理
-                    for similar_comic in similar_comics:
-                        processed_comics.add(similar_comic.path)
+                # 标记已处理
+                processed_comic_indices.update(valid_similar_comics)
 
         return duplicate_groups
 

@@ -60,7 +60,7 @@ def test_preview_widget():
 
     duplicate_group = DuplicateGroup(
         comics=[comic1, comic2],
-        similar_images=[
+        similar_hash_groups=[
             ("hash1", "hash1", 0),  # 完全相同
             ("hash2", "hash2", 0),  # 完全相同
         ],

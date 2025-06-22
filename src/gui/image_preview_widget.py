@@ -217,9 +217,9 @@ class ImagePreviewWidget(QWidget):
 
         # 计算重复图片数量
         duplicate_count = 0
-        if self.current_group and self.current_group.similar_images:
+        if self.current_group and self.current_group.similar_hash_groups:
             current_comic_hashes = set(comic.image_hashes.values())
-            for hash1, hash2, _similarity in self.current_group.similar_images:
+            for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
                 if hash1 in current_comic_hashes or hash2 in current_comic_hashes:
                     duplicate_count += 1
 
@@ -255,7 +255,7 @@ class ImagePreviewWidget(QWidget):
 
     def _load_duplicate_images(self, preview_size):
         """加载重复图片"""
-        if not self.current_group or not self.current_group.similar_images:
+        if not self.current_group or not self.current_group.similar_hash_groups:
             self.status_label.setText("该重复组没有相似图片")
             return
 
@@ -263,7 +263,7 @@ class ImagePreviewWidget(QWidget):
         current_comic_hashes = set(self.current_comic.image_hashes.values())
         target_hashes = []
 
-        for hash1, hash2, _similarity in self.current_group.similar_images:
+        for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
             if hash1 in current_comic_hashes:
                 target_hashes.append(hash1)
             if hash2 in current_comic_hashes:

@@ -140,7 +140,7 @@ class DuplicateListWidget(QWidget):
 
             # 收集当前漫画相关的重复图片哈希
             group_image_hashes = set()
-            for hash1, hash2, _similarity in group.similar_images:
+            for hash1, hash2, _similarity in group.similar_hash_groups:
                 group_image_hashes.add(hash1)
                 group_image_hashes.add(hash2)
 
