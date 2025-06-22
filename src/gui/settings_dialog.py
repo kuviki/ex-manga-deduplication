@@ -144,14 +144,25 @@ class SettingsDialog(QDialog):
         filter_layout = QFormLayout(filter_group)
 
         self.min_width_spinbox = QSpinBox()
-        self.min_width_spinbox.setRange(1, 9999)
+        self.min_width_spinbox.setRange(1, 2147483647)
         self.min_width_spinbox.setSuffix(" 像素")
         filter_layout.addRow("最小图片宽度:", self.min_width_spinbox)
 
         self.min_height_spinbox = QSpinBox()
-        self.min_height_spinbox.setRange(1, 9999)
+        self.min_height_spinbox.setRange(1, 2147483647)
         self.min_height_spinbox.setSuffix(" 像素")
         filter_layout.addRow("最小图片高度:", self.min_height_spinbox)
+
+        # 漫画图片数量范围
+        self.min_image_count_spinbox = QSpinBox()
+        self.min_image_count_spinbox.setRange(1, 2147483647)
+        self.min_image_count_spinbox.setSuffix(" 张")
+        filter_layout.addRow("漫画最小图片数量:", self.min_image_count_spinbox)
+
+        self.max_image_count_spinbox = QSpinBox()
+        self.max_image_count_spinbox.setRange(0, 2147483647)
+        self.max_image_count_spinbox.setSuffix(" 张 (0表示无限制)")
+        filter_layout.addRow("漫画最大图片数量:", self.max_image_count_spinbox)
 
         layout.addWidget(filter_group)
 
@@ -315,6 +326,12 @@ class SettingsDialog(QDialog):
         self.min_width_spinbox.setValue(min_width)
         self.min_height_spinbox.setValue(min_height)
 
+        min_image_count, max_image_count = self.config.get_comic_image_count_range()
+        self.min_image_count_spinbox.setValue(min_image_count)
+        self.max_image_count_spinbox.setValue(
+            max_image_count if max_image_count is not None else 0
+        )
+
         # 应用程序设置
         self.comic_viewer_edit.setText(self.config.get_comic_viewer_path())
 
@@ -358,6 +375,14 @@ class SettingsDialog(QDialog):
             )
             self.config.set(
                 "min_image_resolution.height", self.min_height_spinbox.value()
+            )
+
+            # 漫画图片数量范围
+            min_count = self.min_image_count_spinbox.value()
+            max_count = self.max_image_count_spinbox.value()
+            self.config.set("comic_image_count_range.min", min_count)
+            self.config.set(
+                "comic_image_count_range.max", max_count if max_count != 0 else None
             )
 
             # 应用程序设置

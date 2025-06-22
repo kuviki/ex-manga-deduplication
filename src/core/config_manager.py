@@ -50,6 +50,7 @@ class ConfigManager:
             # 重复检测设置
             "min_similar_images": 3,
             "min_image_resolution": {"width": 100, "height": 100},
+            "comic_image_count_range": {"min": 1, "max": None},  # 参与去重的漫画图片数量范围，max为None表示无限制
             # 应用程序设置
             "comic_viewer_path": "",
             "error_handling": ErrorHandling.ASK.value,
@@ -199,3 +200,10 @@ class ConfigManager:
     def get_blacklist_folder(self) -> str:
         """获取黑名单文件路径"""
         return self.get("blacklist_folder", "blacklist")
+
+    def get_comic_image_count_range(self) -> tuple:
+        """获取参与去重的漫画图片数量范围"""
+        range_config = self.get("comic_image_count_range", {"min": 1, "max": None})
+        min_count = range_config.get("min", 1)
+        max_count = range_config.get("max", None)
+        return min_count, max_count

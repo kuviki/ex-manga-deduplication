@@ -306,11 +306,28 @@ class Scanner(QObject):
 
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
+        min_image_count, max_image_count = self.config.get_comic_image_count_range()
 
-        # 过滤有效的漫画
-        valid_comics = [
-            comic for comic in comic_infos if not comic.error and comic.image_hashes
-        ]
+        # 过滤有效的漫画（包括图片数量范围过滤）
+        valid_comics = []
+        filtered_count = 0
+        for comic in comic_infos:
+            if comic.error or not comic.image_hashes:
+                continue
+            
+            image_count = len(comic.image_hashes)
+            # 检查图片数量是否在配置范围内
+            if image_count < min_image_count:
+                filtered_count += 1
+                continue
+            if max_image_count is not None and image_count > max_image_count:
+                filtered_count += 1
+                continue
+                
+            valid_comics.append(comic)
+        
+        if filtered_count > 0:
+            logger.info(f"根据图片数量范围配置过滤了 {filtered_count} 个漫画文件")
         if len(valid_comics) < 2:
             return duplicate_groups
 
