@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
 
         # 状态标签
         self.status_label = QLabel("就绪")
-        self.status_bar.addWidget(self.status_label)
+        self.status_bar.addWidget(self.status_label, 1)
 
         # 统计信息
         self.stats_label = QLabel("")
@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
         )
 
         # 计算并显示经过时间和预计剩余时间
-        elapsed_time = time.time() - progress.start_time
+        elapsed_time = max(time.time() - progress.start_time, 1.0)
         elapsed_str = str(timedelta(seconds=int(elapsed_time)))
 
         if progress.stage == "scanning":
