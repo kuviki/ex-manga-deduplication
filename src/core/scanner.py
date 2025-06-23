@@ -9,11 +9,12 @@ import time
 import pickle
 import numpy as np
 import imagehash
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from loguru import logger
 from PyQt5.QtCore import QObject, pyqtSignal
+from numpy.typing import NDArray
 
 from .config_manager import ConfigManager
 from .archive_reader import ArchiveReader
@@ -53,7 +54,9 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
-    image_hashes: List[Tuple[str, str, np.ndarray]]  # filename, hash_hex, hash_array
+    image_hashes: List[
+        Tuple[str, str, NDArray[np.uint8]]
+    ]  # filename, hash_hex, hash_array
     cache_key: str  # 缓存键
     error: Optional[str] = None
     checked: bool = False  # 是否已检查标记
@@ -216,14 +219,12 @@ class Scanner(QObject):
 
         return comic_infos
 
-    def _persist_cache_keys(
-        self, similar_comic_cache_keys: set, skipped_comic_cache_keys: set
-    ):
+    def _persist_cache_keys(self, similar_comic_cache_dict: dict):
         """持久化缓存键"""
         try:
             with open("index.db", "wb") as f:
                 pickle.dump(
-                    (similar_comic_cache_keys, skipped_comic_cache_keys),
+                    similar_comic_cache_dict,
                     f,
                     protocol=pickle.HIGHEST_PROTOCOL,
                 )
@@ -317,20 +318,16 @@ class Scanner(QObject):
         duplicate_groups = []
         processed_comic_indices = set()
 
-        # 加载缓存
-        try:
-            with open("index.db", "rb") as f:
-                similar_comic_cache_keys, skipped_comic_cache_keys = pickle.load(f)
-            skipped_comic_cache_keys = (
-                skipped_comic_cache_keys - similar_comic_cache_keys
-            )
-        except Exception:
-            similar_comic_cache_keys = set()
-            skipped_comic_cache_keys = set()
-
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
         min_image_count, max_image_count = self.config.get_comic_image_count_range()
+
+        # 加载缓存
+        try:
+            with open("index.db", "rb") as f:
+                similar_comic_cache_dict: Dict[str, NDArray[np.int64]] = pickle.load(f)
+        except Exception:
+            similar_comic_cache_dict = dict()
 
         # 过滤有效的漫画（包括图片数量范围过滤）
         valid_comics: List[ComicInfo] = []
@@ -355,6 +352,17 @@ class Scanner(QObject):
         if len(valid_comics) < 2:
             return duplicate_groups
 
+        logger.info(f"开始检测 {len(valid_comics)} 个漫画的重复")
+
+        # 从缓存中筛选出相似漫画
+        similar_comic_cache_keys = set()
+        skipped_comic_cache_keys = set()
+        for cache_key, similar_image_counts in similar_comic_cache_dict.items():
+            if np.any(similar_image_counts >= min_similar_images):
+                similar_comic_cache_keys.add(cache_key)
+            else:
+                skipped_comic_cache_keys.add(cache_key)
+
         # 对 valid_comics 进行排序
         if similar_comic_cache_keys or skipped_comic_cache_keys:
             valid_comics.sort(
@@ -364,8 +372,6 @@ class Scanner(QObject):
                 if x.cache_key in skipped_comic_cache_keys
                 else 1
             )
-
-        logger.info(f"开始使用numpy优化算法检测 {len(valid_comics)} 个漫画的重复")
 
         # 生成黑名单图片哈希
         blacklist_hashes = self.blacklist_manager.get_all_hashes()
@@ -378,8 +384,6 @@ class Scanner(QObject):
                 blacklist_hashes_array.append(hash_array.flatten())
             blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
             del blacklist_hashes_array
-        else:
-            blacklist_hashes = None
 
         # 构建全局哈希数组和索引映射
         all_hashes = []
@@ -394,7 +398,7 @@ class Scanner(QObject):
             hash_arrays = np.array([h[2] for h in comic.image_hashes])
 
             # 批量计算黑名单距离
-            if blacklist_hashes is not None:
+            if blacklist_hashes:
                 hamming_distances = np.dot(blacklist_hashes, hash_arrays.T)
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=0
@@ -465,8 +469,6 @@ class Scanner(QObject):
                 logger.info("处理已停止")
                 break
 
-            skipped_comic_cache_keys.add(comic.cache_key)
-
             if comic_idx in processed_comic_indices:
                 continue
 
@@ -494,6 +496,9 @@ class Scanner(QObject):
 
             # 统计每个漫画的相似图片数量
             unique_comics, counts = np.unique(similar_comic_indices, return_counts=True)
+
+            # 更新缓存
+            similar_comic_cache_dict[comic.cache_key] = counts
 
             # 找到满足最小相似图片数量要求的漫画
             valid_similar_comics = unique_comics[counts >= min_similar_images]
@@ -545,15 +550,9 @@ class Scanner(QObject):
                 # 标记已处理
                 processed_comic_indices.update(valid_similar_comics)
 
-                # 更新缓存并持久化
-                similar_comic_cache_keys.update(
-                    comic.cache_key for comic in similar_comics
-                )
-                self._persist_cache_keys(
-                    similar_comic_cache_keys, skipped_comic_cache_keys
-                )
+                # 缓存持久化
+                self._persist_cache_keys(similar_comic_cache_dict)
 
-        self._persist_cache_keys(similar_comic_cache_keys, skipped_comic_cache_keys)
+        # 缓存持久化
+        self._persist_cache_keys(similar_comic_cache_dict)
         return duplicate_groups
-
-    # _compare_comics方法已被numpy优化的_detect_duplicates方法替代，不再需要

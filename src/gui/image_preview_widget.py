@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QFont
 from loguru import logger
+from numpy.typing import NDArray
 
 from src.utils.file_utils import natural_sort_key
 
@@ -39,7 +40,7 @@ class ImageLoadThread(QThread):
     def __init__(
         self,
         comic_path: str,
-        comic_hashes: List[Tuple[str, str, np.ndarray]],
+        comic_hashes: List[Tuple[str, str, NDArray[np.uint8]]],
         image_indices: List[int],
         max_size: tuple,
     ):

@@ -9,6 +9,7 @@ from PIL import Image
 import numpy as np
 from typing import Union, Tuple
 from loguru import logger
+from numpy.typing import NDArray
 from .config_manager import HashAlgorithm
 
 
@@ -24,7 +25,7 @@ class ImageHasher:
             HashAlgorithm.WAVELET: imagehash.whash,
         }
 
-    def calculate_hash(self, image: Union[Image.Image, np.ndarray, bytes]) -> str:
+    def calculate_hash(self, image: Union[Image.Image, NDArray, bytes]) -> str:
         """计算图片哈希值
 
         Args:
