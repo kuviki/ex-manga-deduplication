@@ -316,7 +316,6 @@ class Scanner(QObject):
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
         """检测重复漫画 - 使用numpy优化的高性能实现"""
         duplicate_groups = []
-        processed_comic_indices = set()
 
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
@@ -451,6 +450,7 @@ class Scanner(QObject):
         self.progress.history = []
 
         # 对每个漫画进行重复检测
+        processed_comic_indices = set()
         for comic_idx, comic in enumerate(valid_comics):
             # 如果之后的漫画已跳过，则停止处理
             if comic.cache_key in skipped_comic_cache_keys:
@@ -484,10 +484,8 @@ class Scanner(QObject):
             )  # 当前漫画的哈希矩阵
 
             # 计算当前漫画图片与后续图片的汉明距离矩阵
-            sub_hashes = all_hashes[end_idx:]
-            sub_hashes_inv = all_hashes_inv[end_idx:]
-            hamming_distances = np.dot(comic_hashes, sub_hashes_inv.T) + np.dot(
-                1 - comic_hashes, sub_hashes.T
+            hamming_distances = np.dot(comic_hashes, all_hashes_inv.T) + np.dot(
+                1 - comic_hashes, all_hashes.T
             )  # shape: (comic_images, all_images)
 
             # 应用相似度阈值
@@ -495,10 +493,14 @@ class Scanner(QObject):
 
             # 获取相似图片对应的漫画索引
             similar_image_mask = np.any(similarity_mask, axis=0)
-            similar_comic_indices = hash_to_comic_idx[end_idx:][similar_image_mask]
+            similar_comic_indices = hash_to_comic_idx[similar_image_mask]
 
             # 统计每个漫画的相似图片数量
             unique_comics, counts = np.unique(similar_comic_indices, return_counts=True)
+
+            # 排除当前漫画
+            counts = counts[unique_comics != comic_idx]
+            unique_comics = unique_comics[unique_comics != comic_idx]
 
             # 更新缓存
             similar_comic_cache_dict[comic.cache_key] = counts
@@ -514,6 +516,13 @@ class Scanner(QObject):
             ]
 
             if len(valid_similar_comics) > 0:
+                # 检查是否为重复组中页数最多的漫画
+                max_page_comic_count = max(
+                    len(valid_comics[idx].image_hashes) for idx in valid_similar_comics
+                )
+                if len(comic.image_hashes) < max_page_comic_count:
+                    continue
+
                 # 构建重复组
                 similar_comics = [comic]
                 all_similar_groups = []
@@ -526,9 +535,7 @@ class Scanner(QObject):
                     similar_start_idx, similar_end_idx = comic_hash_ranges[
                         similar_comic_idx
                     ]
-                    image_mask = similarity_mask[
-                        :, similar_start_idx - end_idx : similar_end_idx - end_idx
-                    ]
+                    image_mask = similarity_mask[:, similar_start_idx:similar_end_idx]
                     image_positions = np.nonzero(image_mask)
 
                     for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
@@ -537,9 +544,7 @@ class Scanner(QObject):
                         hash2 = all_hashes[similar_start_idx + pos_j]
                         hash2 = str(imagehash.ImageHash(hash2))
                         similarity = int(
-                            hamming_distances[
-                                pos_i, similar_start_idx - end_idx + pos_j
-                            ]
+                            hamming_distances[pos_i, similar_start_idx + pos_j]
                         )
                         all_similar_groups.append((hash1, hash2, similarity))
 
