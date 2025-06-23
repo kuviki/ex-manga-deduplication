@@ -378,7 +378,7 @@ class ImagePreviewWidget(QWidget):
         image_label.setScaledContents(False)
 
         # 图片信息 （可选择复制）
-        info_text = f"图片名称: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
+        info_text = f"图片({index}): {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
         info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setWordWrap(True)
