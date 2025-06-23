@@ -398,7 +398,7 @@ class Scanner(QObject):
             hash_arrays = np.array([h[2] for h in comic.image_hashes])
 
             # 批量计算黑名单距离
-            if blacklist_hashes:
+            if len(blacklist_hashes) > 0:
                 hamming_distances = np.dot(blacklist_hashes, hash_arrays.T)
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=0
