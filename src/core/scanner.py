@@ -399,7 +399,9 @@ class Scanner(QObject):
 
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
-                hamming_distances = np.dot(blacklist_hashes, hash_arrays.T)
+                hamming_distances = np.dot(blacklist_hashes, ~hash_arrays.T) + np.dot(
+                    1 - blacklist_hashes, hash_arrays.T
+                )
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=0
                 )
