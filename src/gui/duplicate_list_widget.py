@@ -73,12 +73,16 @@ class DuplicateListWidget(QWidget):
         self.tree_widget.setAlternatingRowColors(True)
         self.tree_widget.setSelectionMode(QTreeWidget.ExtendedSelection)
 
-        # 设置列宽
+        # 设置列宽和排序
         header = self.tree_widget.header()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tree_widget.setColumnWidth(0, 300)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.Interactive)
+        header.setSectionsMovable(True)
+        header.setSortIndicatorShown(True)
+        header.setStretchLastSection(True)
 
         # 连接信号
         self.tree_widget.itemClicked.connect(self.on_item_clicked)
