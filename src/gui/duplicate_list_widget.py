@@ -7,21 +7,23 @@
 import os
 import subprocess
 from typing import List, Optional
+
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor, QFont
 from PyQt5.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QPushButton,
+    QHeaderView,
     QLabel,
     QMenu,
     QMessageBox,
-    QHeaderView,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QBrush, QColor
 from loguru import logger
+from win32com.shell import shell
 
 from ..core.config_manager import ConfigManager
 from ..core.scanner import DuplicateGroup
@@ -299,12 +301,27 @@ class DuplicateListWidget(QWidget):
 
     def open_file_location(self, file_path: str):
         """打开文件位置"""
+
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "警告", "文件不存在")
+            return
+
         try:
-            if os.path.exists(file_path):
-                windows_file_path = file_path.replace("/", "\\")
-                subprocess.Popen(["explorer", "/select,", windows_file_path])
-            else:
-                QMessageBox.warning(self, "警告", "文件不存在")
+            # 获取文件所在的目录
+            folder_path = os.path.dirname(file_path)
+            # 获取文件名
+            file_name = os.path.basename(file_path)
+
+            # 创建PIDL
+            folder_pidl, _ = shell.SHILCreateFromPath(folder_path, 0)
+            desktop = shell.SHGetDesktopFolder()
+            folder = desktop.BindToObject(folder_pidl, None, shell.IID_IShellFolder)
+
+            # 获取文件项的PIDL
+            item_pidl = folder.ParseDisplayName(0, None, file_name)[1]
+
+            # 调用SHOpenFolderAndSelectItems
+            shell.SHOpenFolderAndSelectItems(folder_pidl, (item_pidl,), 0)
         except Exception as e:
             logger.error(f"打开文件位置失败: {e}")
             QMessageBox.critical(self, "错误", f"打开文件位置失败: {e}")
