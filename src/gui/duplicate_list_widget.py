@@ -31,7 +31,9 @@ class DuplicateListWidget(QWidget):
     """重复漫画列表组件"""
 
     # 信号定义
-    comic_selected = pyqtSignal(object, object, int)  # ComicInfo, DuplicateGroup
+    comic_selected = pyqtSignal(
+        object, object, int
+    )  # ComicInfo, DuplicateGroup, duplicate_count
     comics_to_delete = pyqtSignal(list)  # List[str] - comic paths
 
     def __init__(self, config_manager: ConfigManager, parent=None):
@@ -150,11 +152,10 @@ class DuplicateListWidget(QWidget):
             # 添加漫画节点
             for comic in group.comics:
                 # 计算当前漫画的重复图片数量
-                comic_duplicate_count = len(
-                    group_image_hashes.intersection(
-                        hash[1] for hash in comic.image_hashes
-                    )
-                )
+                comic_duplicate_count = 0
+                for hash in comic.image_hashes:
+                    if hash[1] in group_image_hashes:
+                        comic_duplicate_count += 1
 
                 comic_item = QTreeWidgetItem(group_item)
                 comic_item.setText(0, os.path.basename(comic.path))
