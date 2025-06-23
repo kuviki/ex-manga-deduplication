@@ -115,9 +115,6 @@ class ImageLoadThread(QThread):
 class ImagePreviewWidget(QWidget):
     """图片预览组件"""
 
-    # 信号定义
-    image_blacklisted = pyqtSignal(str)  # 图片被加入黑名单信号
-
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
         self.config = config_manager

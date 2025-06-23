@@ -243,7 +243,6 @@ class MainWindow(QMainWindow):
 
         # 图片预览
         self.image_preview = ImagePreviewWidget(self.config)
-        self.image_preview.image_blacklisted.connect(self.on_image_blacklisted)
 
         right_layout.addWidget(self.image_preview)
 
@@ -491,13 +490,6 @@ class MainWindow(QMainWindow):
 
         # 显示图片预览
         self.image_preview.set_comic(comic_info, duplicate_group)
-
-    def on_image_blacklisted(self, image_hash: str):
-        """处理图片加入黑名单"""
-        # 重新计算重复结果（这里简化处理，实际应该重新扫描）
-        QMessageBox.information(
-            self, "黑名单", "图片已加入黑名单。\n建议重新扫描以更新结果。"
-        )
 
     def delete_comics(self, comic_paths: List[str]):
         """删除选中的漫画"""
