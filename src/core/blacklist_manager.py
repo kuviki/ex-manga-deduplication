@@ -52,6 +52,11 @@ class BlacklistManager:
                                 with Image.open(file_path) as img:
                                     image_hash = self.hasher.calculate_hash(img)
 
+                                    # 检查是否重复
+                                    if image_hash in self.blacklist_hashes:
+                                        logger.warning(f"黑名单图片重复: {filename}")
+                                        continue
+
                                     # 添加到黑名单
                                     self.blacklist_hashes.add(image_hash)
 
@@ -65,7 +70,10 @@ class BlacklistManager:
 
                             except Exception as e:
                                 logger.warning(f"处理黑名单图片失败 {filename}: {e}")
-                                continue
+                        else:
+                            logger.warning(
+                                f"文件 {filename} 不在支持的图片格式列表中，已跳过"
+                            )
 
                 logger.info(f"黑名单加载成功: {len(self.blacklist_hashes)} 个项目")
             except Exception as e:
