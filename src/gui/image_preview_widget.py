@@ -384,6 +384,7 @@ class ImagePreviewWidget(QWidget):
         info_text = f"图片名称: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
         info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        info_label.setWordWrap(True)
         info_label.setAlignment(Qt.AlignCenter)
         info_label.setStyleSheet("font-size: 10px; color: gray;")
 
