@@ -384,6 +384,7 @@ class Scanner(QObject):
                 blacklist_hashes_array.append(hash_array.flatten())
             blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
             del blacklist_hashes_array
+        blacklist_hashes_inv = 1 - blacklist_hashes
 
         # 构建全局哈希数组和索引映射
         all_hashes = []
@@ -400,7 +401,7 @@ class Scanner(QObject):
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
                 hamming_distances = np.dot(blacklist_hashes, ~hash_arrays.T) + np.dot(
-                    1 - blacklist_hashes, hash_arrays.T
+                    blacklist_hashes_inv, hash_arrays.T
                 )
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=0
