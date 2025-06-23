@@ -243,10 +243,10 @@ class DuplicateListWidget(QWidget):
             lambda: self.open_file_location(comic.path)
         )
 
-        # 用查看器打开
+        # 用漫画查看器打开
         viewer_path = self.config.get_comic_viewer_path()
         if viewer_path and os.path.exists(viewer_path):
-            open_viewer_action = menu.addAction("用查看器打开")
+            open_viewer_action = menu.addAction("用漫画查看器打开")
             open_viewer_action.triggered.connect(
                 lambda: self.open_with_viewer(comic.path)
             )
@@ -302,7 +302,7 @@ class DuplicateListWidget(QWidget):
         try:
             if os.path.exists(file_path):
                 windows_file_path = file_path.replace("/", "\\")
-                subprocess.run(["explorer", "/select,", windows_file_path])
+                subprocess.Popen(["explorer", "/select,", windows_file_path])
             else:
                 QMessageBox.warning(self, "警告", "文件不存在")
         except Exception as e:
@@ -310,16 +310,16 @@ class DuplicateListWidget(QWidget):
             QMessageBox.critical(self, "错误", f"打开文件位置失败: {e}")
 
     def open_with_viewer(self, file_path: str):
-        """用指定查看器打开"""
+        """用指定漫画查看器打开"""
         try:
             viewer_path = self.config.get_comic_viewer_path()
             if viewer_path and os.path.exists(viewer_path):
-                subprocess.run([viewer_path, file_path])
+                subprocess.Popen([viewer_path, file_path])
             else:
-                QMessageBox.warning(self, "警告", "查看器程序不存在")
+                QMessageBox.warning(self, "警告", "漫画查看器程序不存在")
         except Exception as e:
-            logger.error(f"打开查看器失败: {e}")
-            QMessageBox.critical(self, "错误", f"打开查看器失败: {e}")
+            logger.error(f"打开漫画查看器失败: {e}")
+            QMessageBox.critical(self, "错误", f"打开漫画查看器失败: {e}")
 
     def open_with_default(self, file_path: str):
         """用默认程序打开"""
