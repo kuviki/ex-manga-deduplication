@@ -130,9 +130,9 @@ class MainWindow(QMainWindow):
         clear_cache_action.triggered.connect(self.clear_cache)
         tools_menu.addAction(clear_cache_action)
 
-        # 黑名单管理
-        blacklist_action = QAction("黑名单管理(&B)", self)
-        blacklist_action.triggered.connect(self.manage_blacklist)
+        # 黑名单统计
+        blacklist_action = QAction("黑名单统计(&B)", self)
+        blacklist_action.triggered.connect(self.blacklist_statistics)
         tools_menu.addAction(blacklist_action)
 
         # 帮助菜单
@@ -593,9 +593,9 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, "清理失败", "缓存清理失败")
 
-    def manage_blacklist(self):
-        """管理黑名单"""
-        # 这里可以打开黑名单管理对话框
+    def blacklist_statistics(self):
+        """黑名单统计"""
+        # 这里可以打开黑名单统计对话框
         stats = self.scanner.blacklist_manager.get_statistics()
         QMessageBox.information(
             self,
