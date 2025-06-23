@@ -265,27 +265,10 @@ class BlacklistManager:
 
     def clear_blacklist(self) -> None:
         """清空黑名单"""
-        try:
-            # 删除黑名单文件夹中的所有图片文件
-            if os.path.exists(self.blacklist_folder) and os.path.isdir(
-                self.blacklist_folder
-            ):
-                for filename in os.listdir(self.blacklist_folder):
-                    file_path = os.path.join(self.blacklist_folder, filename)
-                    if os.path.isfile(file_path):
-                        try:
-                            os.remove(file_path)
-                            logger.debug(f"已删除黑名单文件: {filename}")
-                        except Exception as e:
-                            logger.warning(f"删除黑名单文件失败 {filename}: {e}")
-
-            # 清空内存中的数据
-            self.blacklist_hashes.clear()
-            self.blacklist_info.clear()
-            logger.info("黑名单已清空")
-
-        except Exception as e:
-            logger.error(f"清空黑名单失败: {e}")
+        # 清空内存中的数据
+        self.blacklist_hashes.clear()
+        self.blacklist_info.clear()
+        logger.info("黑名单已清空")
 
     def export_blacklist(self, export_file: str) -> bool:
         """导出黑名单到文件

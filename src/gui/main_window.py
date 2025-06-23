@@ -34,6 +34,7 @@ from ..core.scanner import Scanner, ScanProgress, DuplicateGroup, ComicInfo
 from .settings_dialog import SettingsDialog
 from .image_preview_widget import ImagePreviewWidget
 from .duplicate_list_widget import DuplicateListWidget
+from .about_dialog import AboutDialog
 
 
 class ScanThread(QThread):
@@ -134,6 +135,11 @@ class MainWindow(QMainWindow):
         blacklist_action = QAction("黑名单统计(&B)", self)
         blacklist_action.triggered.connect(self.blacklist_statistics)
         tools_menu.addAction(blacklist_action)
+
+        # 刷新黑名单
+        refresh_blacklist_action = QAction("刷新黑名单(&R)", self)
+        refresh_blacklist_action.triggered.connect(self.refresh_blacklist)
+        tools_menu.addAction(refresh_blacklist_action)
 
         # 帮助菜单
         help_menu = menubar.addMenu("帮助(&H)")
@@ -603,25 +609,21 @@ class MainWindow(QMainWindow):
             f"当前黑名单包含 {stats['total_count']} 个图片",
         )
 
+    def refresh_blacklist(self):
+        """刷新黑名单"""
+        try:
+            self.scanner.blacklist_manager.clear_blacklist()
+            self.scanner.blacklist_manager.load_blacklist()
+            QMessageBox.information(self, "刷新完成", "黑名单已刷新！")
+            logger.info("黑名单已刷新")
+        except Exception as e:
+            QMessageBox.critical(self, "刷新失败", f"黑名单刷新失败: {e}")
+            logger.error(f"黑名单刷新失败: {e}")
+
     def show_about(self):
         """显示关于对话框"""
-        QMessageBox.about(
-            self,
-            "关于 Ex-漫画去重工具",
-            "Ex-漫画去重工具 v1.0.0\n\n"
-            "智能的漫画重复检测和管理工具\n"
-            "帮助您轻松整理大量的漫画收藏\n\n"
-            "特色功能：\n"
-            "• 支持多种图片哈希算法\n"
-            "• 黑名单过滤\n"
-            "• 结果缓存\n"
-            "• 扫描暂停/恢复\n"
-            "• 纯内存读取\n\n"
-            "系统要求：\n"
-            "• Python 3.9+\n"
-            "• Windows 10/11\n"
-            "• 2GB+ 内存",
-        )
+        dialog = AboutDialog(self)
+        dialog.exec_()
 
     def closeEvent(self, event):
         """窗口关闭事件"""
