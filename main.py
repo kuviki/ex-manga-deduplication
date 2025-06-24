@@ -31,7 +31,7 @@ def setup_logging():
     # 文件输出
     logger.add(
         "logs/app.log",
-        level="WARNING",
+        level="INFO",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
         rotation="10 MB",
         retention="7 days",
