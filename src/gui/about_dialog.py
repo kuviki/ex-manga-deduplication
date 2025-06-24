@@ -154,9 +154,9 @@ class AboutDialog(QDialog):
         license_text.setReadOnly(True)
 
         license_content = """
-MIT License
+GPL v3 License
 
-Copyright (c) 2024 漫画去重工具
+Copyright (c) 2025 漫画去重工具
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -184,10 +184,6 @@ SOFTWARE.
 • imagehash - BSD 2-Clause License
 • rarfile - ISC License
 • loguru - MIT License
-• psutil - BSD 3-Clause License
-• diskcache - Apache License 2.0
-• natsort - MIT License
-• configparser - PSF License
 
 感谢这些优秀的开源项目！
 """
