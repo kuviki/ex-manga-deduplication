@@ -184,6 +184,7 @@ SOFTWARE.
 • imagehash - BSD 2-Clause License
 • rarfile - ISC License
 • loguru - MIT License
+• psutil - MIT License
 
 感谢这些优秀的开源项目！
 """
@@ -260,8 +261,6 @@ SOFTWARE.
                     "rarfile",
                     "loguru",
                     "psutil",
-                    "diskcache",
-                    "natsort",
                 ]
 
                 for package in key_packages:

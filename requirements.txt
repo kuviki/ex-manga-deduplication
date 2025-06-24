@@ -1,26 +1,20 @@
-# GUI框架
+# GUI framework
 PyQt5>=5.15.0
 
-# 图像处理
+# Image processing
 Pillow>=9.0.0
 imagehash>=4.3.0
 
-# 压缩包处理
+# Archive processing
 rarfile>=4.0
 
-# 数据处理
+# Data processing
 numpy>=1.21.0
 
-# 缓存
-diskcache>=5.6.0
-
-# 系统操作
+# System operations
 psutil>=5.9.0
 send2trash>=1.8.0
 pywin32>=303
 
-# 日志
+# Logging
 loguru>=0.7.0
-
-# 自然排序
-natsort>=8.0.0
