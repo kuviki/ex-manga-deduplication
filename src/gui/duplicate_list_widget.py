@@ -138,7 +138,7 @@ class DuplicateListWidget(QWidget):
             # 创建组节点
             group_item = QTreeWidgetItem(self.tree_widget)
             group_item.setText(0, f"重复组 {i} ({len(group.comics)} 个文件)")
-            group_item.setText(3, f"{group.similarity_count} 组相似图片")
+            group_item.setText(3, f"{len(group.similar_hash_groups)} 组相似图片")
 
             # 设置组节点样式
             font = QFont()

@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
 
         if duplicate_group:
             info_text += "\n重复组信息:\n"
-            info_text += f"相似图片组数: {duplicate_group.similarity_count}\n"
+            info_text += f"相似图片组数: {len(duplicate_group.similar_hash_groups)}\n"
             info_text += f"组内漫画数量: {len(duplicate_group.comics)}\n"
 
         self.info_text.setText(info_text)
@@ -568,7 +568,7 @@ class MainWindow(QMainWindow):
 
                     for i, group in enumerate(self.current_duplicates, 1):
                         f.write(f"重复组 {i}:\n")
-                        f.write(f"相似图片数量: {group.similarity_count}\n")
+                        f.write(f"相似图片数量: {len(group.similar_hash_groups)}\n")
                         f.write("包含的漫画文件:\n")
 
                         for comic in group.comics:

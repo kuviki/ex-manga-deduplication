@@ -61,6 +61,9 @@ class ComicInfo:
     error: Optional[str] = None
     checked: bool = False  # 是否已检查标记
 
+    def __hash__(self) -> int:
+        return hash(self.cache_key)
+
 
 @dataclass
 class DuplicateGroup:
@@ -68,7 +71,6 @@ class DuplicateGroup:
 
     comics: List[ComicInfo]
     similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
-    similarity_count: int
 
 
 class Scanner(QObject):
@@ -449,6 +451,9 @@ class Scanner(QObject):
         self.progress.start_time = time.time()
         self.progress.history = []
 
+        # 构建漫画到重复组的字典映射
+        comic_to_group_map: Dict[ComicInfo, DuplicateGroup] = {}
+
         # 对每个漫画进行重复检测
         for comic_idx, comic in enumerate(valid_comics):
             # 如果之后的漫画已跳过，则停止处理
@@ -537,8 +542,32 @@ class Scanner(QObject):
                 duplicate_group = DuplicateGroup(
                     comics=similar_comics,
                     similar_hash_groups=all_similar_groups,
-                    similarity_count=len(all_similar_groups),
                 )
+
+                # 合并重复组
+                all_merged_comics = set(similar_comics)
+                for comic in similar_comics:
+                    existing_group = comic_to_group_map.get(comic.cache_key)
+                    if existing_group:
+                        all_merged_comics.update(existing_group.comics)
+                        duplicate_group.similar_hash_groups.update(
+                            existing_group.similar_hash_groups
+                        )
+
+                        # 移除旧的重复组
+                        if existing_group in duplicate_groups:
+                            duplicate_groups.remove(existing_group)
+
+                # 更新 similar_comics 为合并后的结果并排序
+                duplicate_group.comics = sorted(
+                    all_merged_comics, key=lambda c: len(c.image_hashes), reverse=True
+                )
+
+                # 更新字典映射
+                for comic in duplicate_group.comics:
+                    comic_to_group_map[comic.cache_key] = duplicate_group
+
+                # 加入重复组
                 duplicate_groups.append(duplicate_group)
 
                 # 缓存持久化
