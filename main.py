@@ -22,11 +22,14 @@ def setup_logging():
     logger.remove()  # 移除默认处理器
 
     # 控制台输出
-    logger.add(
-        sys.stderr,
-        level="INFO",
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    )
+    try:
+        logger.add(
+            sys.stderr,
+            level="INFO",
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        )
+    except Exception as e:
+        logger.error(f"日志配置失败: {e}")
 
     # 文件输出
     logger.add(

@@ -6,3 +6,7 @@ config.yaml
 /test.rar
 /blacklist/
 /index.db
+/build/
+/dist/
+*.spec
+/main.exe
