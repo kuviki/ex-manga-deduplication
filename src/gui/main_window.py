@@ -24,6 +24,9 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QAction,
     QStatusBar,
+    QToolButton,
+    QMenu,
+    QFrame,
 )
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QFont
@@ -78,9 +81,6 @@ class MainWindow(QMainWindow):
 
         # 创建菜单栏
         self.create_menu_bar()
-
-        # 创建工具栏
-        self.create_toolbar()
 
         # 创建主要内容区域
         self.create_main_content(main_layout)
@@ -153,8 +153,8 @@ class MainWindow(QMainWindow):
     def create_toolbar(self):
         """创建工具栏"""
         # 目录选择区域
-        dir_group = QGroupBox("扫描目录")
-        dir_layout = QHBoxLayout(dir_group)
+        self.dir_group = QGroupBox("扫描目录")
+        dir_layout = QHBoxLayout(self.dir_group)
 
         self.dir_label = QLabel("请选择要扫描的目录...")
         self.dir_label.setStyleSheet("color: gray; font-style: italic;")
@@ -166,8 +166,8 @@ class MainWindow(QMainWindow):
         dir_layout.addWidget(self.select_dir_btn)
 
         # 控制按钮区域
-        control_group = QGroupBox("扫描控制")
-        control_layout = QHBoxLayout(control_group)
+        self.control_group = QGroupBox("扫描控制")
+        control_layout = QHBoxLayout(self.control_group)
 
         self.scan_btn = QPushButton("开始扫描")
         self.scan_btn.clicked.connect(self.start_scan)
@@ -196,30 +196,88 @@ class MainWindow(QMainWindow):
         progress_layout.addWidget(self.progress_bar)
         progress_layout.addWidget(self.progress_label)
 
-        # 工具栏布局
-        toolbar_layout = QVBoxLayout()
+        # 可折叠内容框架
+        self.collapsible_frame = QFrame()
+        self.collapsible_frame.setFrameShape(QFrame.StyledPanel)
+        self.collapsible_frame.setFrameShadow(QFrame.Raised)
+        collapsible_layout = QVBoxLayout(self.collapsible_frame)
+        collapsible_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 创建水平布局容器，放置扫描目录和扫描控制
         top_row_layout = QHBoxLayout()
-        top_row_layout.addWidget(dir_group, 3)  # 扫描目录占更多空间
-        top_row_layout.addWidget(control_group, 1)  # 扫描控制占较少空间
+        top_row_layout.addWidget(self.dir_group, 3)
+        top_row_layout.addWidget(self.control_group, 1)
 
-        # 将水平布局和进度组添加到主布局
-        top_row_container = QWidget()
-        top_row_container.setLayout(top_row_layout)
-        toolbar_layout.addWidget(top_row_container)
-        toolbar_layout.addWidget(self.progress_group)
+        collapsible_layout.addLayout(top_row_layout)
+        collapsible_layout.addWidget(self.progress_group)
+
+        # 工具栏主布局
+        toolbar_main_layout = QVBoxLayout()
+        toolbar_main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 折叠按钮
+        self.collapse_button = QToolButton()
+        self.collapse_button.setArrowType(Qt.DownArrow)
+        self.collapse_button.setText("工具栏")
+        self.collapse_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.collapse_button.clicked.connect(self.toggle_toolbar_visibility)
+
+        # 折叠菜单
+        collapse_menu = QMenu(self)
+        self.action_show_dir = QAction(
+            "显示扫描目录", self, checkable=True, checked=True
+        )
+        self.action_show_dir.triggered.connect(
+            lambda: self.toggle_group_visibility(self.dir_group)
+        )
+        collapse_menu.addAction(self.action_show_dir)
+
+        self.action_show_control = QAction(
+            "显示扫描控制", self, checkable=True, checked=True
+        )
+        self.action_show_control.triggered.connect(
+            lambda: self.toggle_group_visibility(self.control_group)
+        )
+        collapse_menu.addAction(self.action_show_control)
+
+        self.action_show_progress = QAction(
+            "显示扫描进度", self, checkable=True, checked=True
+        )
+        self.action_show_progress.triggered.connect(
+            lambda: self.toggle_group_visibility(self.progress_group)
+        )
+        collapse_menu.addAction(self.action_show_progress)
+
+        self.collapse_button.setMenu(collapse_menu)
+        self.collapse_button.setPopupMode(QToolButton.InstantPopup)
+
+        # 将折叠按钮和可折叠框架添加到主布局
+        toolbar_main_layout.addWidget(self.collapse_button)
+        toolbar_main_layout.addWidget(self.collapsible_frame)
 
         toolbar_widget = QWidget()
-        toolbar_widget.setLayout(toolbar_layout)
+        toolbar_widget.setLayout(toolbar_main_layout)
 
         return toolbar_widget
 
+    # 右侧：图片预览
+    def toggle_toolbar_visibility(self):
+        """切换工具栏的可见性"""
+        is_visible = self.collapsible_frame.isVisible()
+        self.collapsible_frame.setVisible(not is_visible)
+        if is_visible:
+            self.collapse_button.setArrowType(Qt.RightArrow)
+        else:
+            self.collapse_button.setArrowType(Qt.DownArrow)
+
+    def toggle_group_visibility(self, group_box):
+        """切换指定分组的可见性"""
+        group_box.setVisible(not group_box.isVisible())
+
     def create_main_content(self, main_layout):
         """创建主要内容区域"""
-        # 添加工具栏
-        toolbar = self.create_toolbar()
-        main_layout.addWidget(toolbar)
+        # 创建工具栏
+        self.toolbar_widget = self.create_toolbar()
+        main_layout.addWidget(self.toolbar_widget)
 
         # 创建分割器
         splitter = QSplitter(Qt.Horizontal)
