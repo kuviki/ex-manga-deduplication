@@ -10,3 +10,4 @@ config.yaml
 /dist/
 *.spec
 /main.exe
+/test/
