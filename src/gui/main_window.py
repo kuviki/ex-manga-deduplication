@@ -25,7 +25,6 @@ from PyQt5.QtWidgets import (
     QAction,
     QStatusBar,
     QToolButton,
-    QMenu,
     QFrame,
 )
 from PyQt5.QtCore import Qt, QThread
@@ -219,36 +218,7 @@ class MainWindow(QMainWindow):
         self.collapse_button.setArrowType(Qt.DownArrow)
         self.collapse_button.setText("工具栏")
         self.collapse_button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        self.collapse_button.clicked.connect(self.toggle_toolbar_visibility)
-
-        # 折叠菜单
-        collapse_menu = QMenu(self)
-        self.action_show_dir = QAction(
-            "显示扫描目录", self, checkable=True, checked=True
-        )
-        self.action_show_dir.triggered.connect(
-            lambda: self.toggle_group_visibility(self.dir_group)
-        )
-        collapse_menu.addAction(self.action_show_dir)
-
-        self.action_show_control = QAction(
-            "显示扫描控制", self, checkable=True, checked=True
-        )
-        self.action_show_control.triggered.connect(
-            lambda: self.toggle_group_visibility(self.control_group)
-        )
-        collapse_menu.addAction(self.action_show_control)
-
-        self.action_show_progress = QAction(
-            "显示扫描进度", self, checkable=True, checked=True
-        )
-        self.action_show_progress.triggered.connect(
-            lambda: self.toggle_group_visibility(self.progress_group)
-        )
-        collapse_menu.addAction(self.action_show_progress)
-
-        self.collapse_button.setMenu(collapse_menu)
-        self.collapse_button.setPopupMode(QToolButton.InstantPopup)
+        self.collapse_button.clicked.connect(self.toggle_groups_visibility)
 
         # 将折叠按钮和可折叠框架添加到主布局
         toolbar_main_layout.addWidget(self.collapse_button)
@@ -259,19 +229,12 @@ class MainWindow(QMainWindow):
 
         return toolbar_widget
 
-    # 右侧：图片预览
-    def toggle_toolbar_visibility(self):
-        """切换工具栏的可见性"""
-        is_visible = self.collapsible_frame.isVisible()
-        self.collapsible_frame.setVisible(not is_visible)
-        if is_visible:
-            self.collapse_button.setArrowType(Qt.RightArrow)
-        else:
-            self.collapse_button.setArrowType(Qt.DownArrow)
-
-    def toggle_group_visibility(self, group_box):
-        """切换指定分组的可见性"""
-        group_box.setVisible(not group_box.isVisible())
+    def toggle_groups_visibility(self):
+        """切换分组的可见性"""
+        is_visible = not self.dir_group.isVisible()
+        self.dir_group.setVisible(is_visible)
+        self.control_group.setVisible(is_visible)
+        self.progress_group.setVisible(is_visible)
 
     def create_main_content(self, main_layout):
         """创建主要内容区域"""
