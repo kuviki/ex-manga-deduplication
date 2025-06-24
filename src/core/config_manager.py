@@ -58,15 +58,6 @@ class ConfigManager:
             "comic_viewer_path": "",
             "error_handling": ErrorHandling.SKIP.value,
             # 扫描设置
-            "supported_formats": [".zip", ".rar", ".cbr", ".cbz"],
-            "supported_image_formats": [
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".gif",
-                ".bmp",
-                ".webp",
-            ],
             "max_workers": 4,
             # 缓存设置
             "enable_cache": True,
@@ -169,14 +160,21 @@ class ConfigManager:
 
     def get_supported_formats(self) -> list:
         """获取支持的压缩包格式"""
-        return self.get("supported_formats", [".zip", ".rar", ".cbr", ".cbz"])
+        return [".zip", ".rar", ".cbr", ".cbz"]
 
     def get_supported_image_formats(self) -> list:
         """获取支持的图片格式"""
-        return self.get(
-            "supported_image_formats",
-            [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"],
-        )
+        return [
+            ".jpg",
+            ".jpeg",
+            ".jpe",
+            ".jif",
+            ".jfif",
+            ".png",
+            ".gif",
+            ".bmp",
+            ".webp",
+        ]
 
     def is_cache_enabled(self) -> bool:
         """是否启用缓存"""
