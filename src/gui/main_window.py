@@ -404,9 +404,9 @@ class MainWindow(QMainWindow):
         if progress.history is None:
             progress.history = []
         progress.history.append((current_time, progress.processed_files))
-        # 移除超过三分钟的旧数据
+        # 移除超过10分钟的旧数据
         progress.history = [
-            (t, p) for t, p in progress.history if current_time - t <= 60 * 5
+            (t, p) for t, p in progress.history if current_time - t <= 60 * 10
         ]
 
         files_per_second_window = 0
