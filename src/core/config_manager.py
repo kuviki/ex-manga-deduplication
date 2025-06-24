@@ -56,7 +56,7 @@ class ConfigManager:
             },  # 参与去重的漫画图片数量范围，max为None表示无限制
             # 应用程序设置
             "comic_viewer_path": "",
-            "error_handling": ErrorHandling.ASK.value,
+            "error_handling": ErrorHandling.SKIP.value,
             # 扫描设置
             "supported_formats": [".zip", ".rar", ".cbr", ".cbz"],
             "supported_image_formats": [
@@ -151,12 +151,12 @@ class ConfigManager:
 
     def get_error_handling(self) -> ErrorHandling:
         """获取错误处理方式"""
-        handling_str = self.get("error_handling", ErrorHandling.ASK.value)
+        handling_str = self.get("error_handling", ErrorHandling.SKIP.value)
         try:
             return ErrorHandling(handling_str)
         except ValueError:
             logger.warning(f"未知的错误处理方式: {handling_str}，使用默认方式")
-            return ErrorHandling.ASK
+            return ErrorHandling.SKIP
 
     def get_min_similar_images(self) -> int:
         """获取最小相似图片数量"""

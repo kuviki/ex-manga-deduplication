@@ -147,11 +147,13 @@ class SettingsDialog(QDialog):
         self.min_width_spinbox.setRange(1, 2147483647)
         self.min_width_spinbox.setSuffix(" 像素")
         filter_layout.addRow("最小图片宽度:", self.min_width_spinbox)
+        self.min_width_spinbox.setDisabled(True)
 
         self.min_height_spinbox = QSpinBox()
         self.min_height_spinbox.setRange(1, 2147483647)
         self.min_height_spinbox.setSuffix(" 像素")
         filter_layout.addRow("最小图片高度:", self.min_height_spinbox)
+        self.min_height_spinbox.setDisabled(True)
 
         # 漫画图片数量范围
         self.min_image_count_spinbox = QSpinBox()
@@ -214,6 +216,7 @@ class SettingsDialog(QDialog):
             self.error_handling_combo.addItem(
                 self._get_error_handling_display_name(handling), handling.value
             )
+        self.error_handling_combo.setDisabled(True)
 
         error_layout.addRow("遇到错误时:", self.error_handling_combo)
 
@@ -462,8 +465,8 @@ class SettingsDialog(QDialog):
     def _get_error_handling_display_name(self, handling: ErrorHandling) -> str:
         """获取错误处理方式显示名称"""
         names = {
-            ErrorHandling.ASK: "询问用户",
-            ErrorHandling.SKIP: "跳过错误",
+            ErrorHandling.ASK: "询问",
+            ErrorHandling.SKIP: "跳过",
             ErrorHandling.ABORT: "中止扫描",
         }
         return names.get(handling, handling.value)
