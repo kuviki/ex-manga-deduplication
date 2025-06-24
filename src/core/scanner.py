@@ -9,7 +9,7 @@ import time
 import pickle
 import numpy as np
 import imagehash
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Set, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from loguru import logger
@@ -67,7 +67,7 @@ class DuplicateGroup:
     """重复漫画组"""
 
     comics: List[ComicInfo]
-    similar_hash_groups: List[Tuple[str, str, int]]  # (hash1, hash2, similarity)
+    similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
     similarity_count: int
 
 
@@ -525,7 +525,7 @@ class Scanner(QObject):
 
                 # 构建重复组
                 similar_comics = [comic]
-                all_similar_groups = []
+                all_similar_groups = set()
 
                 for similar_comic_idx in valid_similar_comics:
                     similar_comic = valid_comics[similar_comic_idx]
@@ -546,7 +546,11 @@ class Scanner(QObject):
                         similarity = int(
                             hamming_distances[pos_i, similar_start_idx + pos_j]
                         )
-                        all_similar_groups.append((hash1, hash2, similarity))
+
+                        # 确保哈希顺序一致
+                        if hash1 > hash2:
+                            hash1, hash2 = hash2, hash1
+                        all_similar_groups.add((hash1, hash2, similarity))
 
                 duplicate_group = DuplicateGroup(
                     comics=similar_comics,
