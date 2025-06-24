@@ -77,7 +77,7 @@ class DuplicateListWidget(QWidget):
 
         # 设置列宽和排序
         header = self.tree_widget.header()
-        self.tree_widget.setColumnWidth(0, 300)
+        self.tree_widget.setColumnWidth(0, 350)
         header.setSectionResizeMode(0, QHeaderView.Interactive)
         header.setSectionResizeMode(1, QHeaderView.Interactive)
         header.setSectionResizeMode(2, QHeaderView.Interactive)
