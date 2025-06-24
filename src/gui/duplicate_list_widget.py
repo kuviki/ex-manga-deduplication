@@ -288,7 +288,13 @@ class DuplicateListWidget(QWidget):
         # 选择同组其他文件
         select_group_action = menu.addAction("选择同组文件")
         select_group_action.triggered.connect(
-            lambda: self.select_group_items(data["group"])
+            lambda: self.select_group_items(data["group"], True)
+        )
+
+        # 取消选择同组其他文件
+        select_group_action = menu.addAction("取消选择同组文件")
+        select_group_action.triggered.connect(
+            lambda: self.select_group_items(data["group"], False)
         )
 
         menu.addSeparator()
@@ -369,7 +375,7 @@ class DuplicateListWidget(QWidget):
                 child_item = group_item.child(child_index)
                 child_item.setCheckState(0, Qt.Checked)
 
-    def select_group_items(self, target_group: DuplicateGroup):
+    def select_group_items(self, target_group: DuplicateGroup, check: bool):
         """选择指定组的所有项目"""
         for group_index in range(self.tree_widget.topLevelItemCount()):
             group_item = self.tree_widget.topLevelItem(group_index)
@@ -378,7 +384,7 @@ class DuplicateListWidget(QWidget):
             if data and data["type"] == "group" and data["group"] == target_group:
                 for child_index in range(group_item.childCount()):
                     child_item = group_item.child(child_index)
-                    child_item.setCheckState(0, Qt.Checked)
+                    child_item.setCheckState(0, Qt.Checked if check else Qt.Unchecked)
                 break
 
     def delete_selected(self):
