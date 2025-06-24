@@ -9,6 +9,7 @@ import time
 from typing import List
 from datetime import timedelta
 from PyQt5.QtWidgets import (
+    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -449,6 +450,7 @@ class MainWindow(QMainWindow):
 
         self.reset_scan_ui()
 
+        QApplication.alert(self)
         if duplicate_groups:
             QMessageBox.information(
                 self,
