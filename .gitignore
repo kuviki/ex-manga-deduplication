@@ -11,3 +11,4 @@ config.yaml
 *.spec
 /main.exe
 /test/
+/.venv/
