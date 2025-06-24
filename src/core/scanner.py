@@ -317,7 +317,7 @@ class Scanner(QObject):
 
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
         """检测重复漫画 - 使用numpy优化的高性能实现"""
-        duplicate_groups = []
+        duplicate_groups: List[DuplicateGroup] = []
 
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
