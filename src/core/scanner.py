@@ -450,7 +450,6 @@ class Scanner(QObject):
         self.progress.history = []
 
         # 对每个漫画进行重复检测
-        processed_comic_indices = set()
         for comic_idx, comic in enumerate(valid_comics):
             # 如果之后的漫画已跳过，则停止处理
             if comic.cache_key in skipped_comic_cache_keys:
@@ -471,9 +470,6 @@ class Scanner(QObject):
             if self.should_stop:
                 logger.info("处理已停止")
                 break
-
-            if comic_idx in processed_comic_indices:
-                continue
 
             if comic_idx not in comic_hash_ranges:
                 continue
@@ -508,21 +504,7 @@ class Scanner(QObject):
             # 找到满足最小相似图片数量要求的漫画
             valid_similar_comics = unique_comics[counts >= min_similar_images]
 
-            # 去除已经处理过的漫画
-            valid_similar_comics = [
-                int(idx)
-                for idx in valid_similar_comics
-                if idx not in processed_comic_indices
-            ]
-
             if len(valid_similar_comics) > 0:
-                # 检查是否为重复组中页数最多的漫画
-                max_page_comic_count = max(
-                    len(valid_comics[idx].image_hashes) for idx in valid_similar_comics
-                )
-                if len(comic.image_hashes) < max_page_comic_count:
-                    continue
-
                 # 构建重复组
                 similar_comics = [comic]
                 all_similar_groups = set()
@@ -558,9 +540,6 @@ class Scanner(QObject):
                     similarity_count=len(all_similar_groups),
                 )
                 duplicate_groups.append(duplicate_group)
-
-                # 标记已处理
-                processed_comic_indices.update(valid_similar_comics)
 
                 # 缓存持久化
                 self._persist_cache_keys(similar_comic_cache_dict)
