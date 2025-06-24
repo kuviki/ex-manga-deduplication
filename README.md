@@ -1,4 +1,4 @@
-# 漫画去重工具
+# Ex漫画去重工具
 
 一个功能强大的漫画重复文件检测工具，支持多种压缩格式和图像哈希算法。
 
@@ -37,7 +37,7 @@
 ### 1. 克隆项目
 ```bash
 git clone <repository-url>
-cd Ex-Deduplication2
+cd ex-manga-deduplication
 ```
 
 ### 2. 安装依赖
@@ -151,7 +151,6 @@ A: 减少最大工作线程数，或分批处理大量文件
 
 ### 项目结构
 ```
-Ex-Deduplication2/
 ├── main.py                 # 程序入口
 ├── requirements.txt        # 依赖包列表
 ├── README.md              # 说明文档
