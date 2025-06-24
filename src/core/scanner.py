@@ -352,10 +352,10 @@ class Scanner(QObject):
 
         logger.info(f"开始检测 {len(valid_comics)} 个漫画的重复")
 
-        # 从缓存中筛选出相似漫画
+        # 从缓存中筛选出跳过的漫画
         skipped_comic_cache_keys = set()
         for cache_key, similar_image_counts in similar_comic_cache_dict.items():
-            if np.any(similar_image_counts < min_similar_images):
+            if np.all(similar_image_counts < min_similar_images):
                 skipped_comic_cache_keys.add(cache_key)
 
         # 对 valid_comics 进行排序
