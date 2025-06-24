@@ -356,22 +356,15 @@ class Scanner(QObject):
         logger.info(f"开始检测 {len(valid_comics)} 个漫画的重复")
 
         # 从缓存中筛选出相似漫画
-        similar_comic_cache_keys = set()
         skipped_comic_cache_keys = set()
         for cache_key, similar_image_counts in similar_comic_cache_dict.items():
-            if np.any(similar_image_counts >= min_similar_images):
-                similar_comic_cache_keys.add(cache_key)
-            else:
+            if np.any(similar_image_counts < min_similar_images):
                 skipped_comic_cache_keys.add(cache_key)
 
         # 对 valid_comics 进行排序
-        if similar_comic_cache_keys or skipped_comic_cache_keys:
+        if skipped_comic_cache_keys:
             valid_comics.sort(
-                key=lambda x: 0
-                if x.cache_key in similar_comic_cache_keys
-                else 2
-                if x.cache_key in skipped_comic_cache_keys
-                else 1
+                key=lambda x: 1 if x.cache_key in skipped_comic_cache_keys else 0
             )
 
         # 生成黑名单图片哈希
@@ -456,8 +449,8 @@ class Scanner(QObject):
 
         # 对每个漫画进行重复检测
         for comic_idx, comic in enumerate(valid_comics):
-            # 如果之后的漫画已跳过，则停止处理
-            if comic.cache_key in skipped_comic_cache_keys:
+            # 之后的漫画已跳过，停止处理
+            if comic_idx >= remaining_count:
                 logger.info("遇到已跳过的漫画，提前结束重复检测")
                 break
 
