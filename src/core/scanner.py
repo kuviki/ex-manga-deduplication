@@ -515,9 +515,6 @@ class Scanner(QObject):
                 all_similar_groups = set()
 
                 for similar_comic_idx in valid_similar_comics:
-                    similar_comic = valid_comics[similar_comic_idx]
-                    similar_comics.append(similar_comic)
-
                     # 收集相似图片的位置信息
                     similar_start_idx, similar_end_idx = comic_hash_ranges[
                         similar_comic_idx
@@ -525,19 +522,28 @@ class Scanner(QObject):
                     image_mask = similarity_mask[:, similar_start_idx:similar_end_idx]
                     image_positions = np.nonzero(image_mask)
 
-                    for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
-                        hash1 = all_hashes[start_idx + pos_i]
-                        hash1 = str(imagehash.ImageHash(hash1))
-                        hash2 = all_hashes[similar_start_idx + pos_j]
-                        hash2 = str(imagehash.ImageHash(hash2))
-                        similarity = int(
-                            hamming_distances[pos_i, similar_start_idx + pos_j]
-                        )
+                    # 确保当前漫画也满足最小相似图片数量要求
+                    current_comic_similar_count = len(np.unique(image_positions[0]))
+                    if current_comic_similar_count >= min_similar_images:
+                        similar_comic = valid_comics[similar_comic_idx]
+                        similar_comics.append(similar_comic)
 
-                        # 确保哈希顺序一致
-                        if hash1 > hash2:
-                            hash1, hash2 = hash2, hash1
-                        all_similar_groups.add((hash1, hash2, similarity))
+                        for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
+                            hash1 = all_hashes[start_idx + pos_i]
+                            hash1 = str(imagehash.ImageHash(hash1))
+                            hash2 = all_hashes[similar_start_idx + pos_j]
+                            hash2 = str(imagehash.ImageHash(hash2))
+                            similarity = int(
+                                hamming_distances[pos_i, similar_start_idx + pos_j]
+                            )
+
+                            # 确保哈希顺序一致
+                            if hash1 > hash2:
+                                hash1, hash2 = hash2, hash1
+                            all_similar_groups.add((hash1, hash2, similarity))
+
+                if len(similar_comics) <= 1:
+                    continue
 
                 duplicate_group = DuplicateGroup(
                     comics=similar_comics,
