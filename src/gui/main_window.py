@@ -420,39 +420,19 @@ class MainWindow(QMainWindow):
             processed_text = "已处理"
             duplicates_text = f"，找到 {progress.duplicates_found} 组重复"
 
-        # 更新进度历史，只保留最近的数据
-        current_time = time.time()
-        if progress.history is None:
-            progress.history = []
-        progress.history.append((current_time, progress.processed_files))
-
-        # 移除超过10分钟的旧数据
-        progress.history = [
-            (t, p) for t, p in progress.history if current_time - t <= 60 * 10
-        ]
-
-        files_per_second_window = 0
-        if len(progress.history) > 1:
-            # 计算最近时段内的处理速度
-            time_window_start = progress.history[0][0]
-            files_processed_window_start = progress.history[0][1]
-            time_window_end = progress.history[-1][0]
-            files_processed_window_end = progress.history[-1][1]
-
-            time_diff = time_window_end - time_window_start
-            files_diff = files_processed_window_end - files_processed_window_start
-
-            if time_diff > 0:
-                files_per_second_window = files_diff / time_diff
-
-        remaining_files = progress.total_files - progress.processed_files
-
-        if files_per_second_window > 0 and remaining_files > 0:
-            remaining_time = remaining_files / files_per_second_window
-            remaining_str = str(timedelta(seconds=int(remaining_time)))
-            self.status_label.setText(
-                f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str} | 预计剩余: {remaining_str}"
-            )
+        if progress.processed_files > 0:
+            files_per_second = progress.processed_files / elapsed_time
+            remaining_files = progress.total_files - progress.processed_files
+            if files_per_second > 0:
+                remaining_time = remaining_files / files_per_second
+                remaining_str = str(timedelta(seconds=int(remaining_time)))
+                self.status_label.setText(
+                    f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str} | 预计剩余: {remaining_str}"
+                )
+            else:
+                self.status_label.setText(
+                    f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str}"
+                )
         else:
             self.status_label.setText(
                 f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str}"

@@ -35,9 +35,6 @@ class ScanProgress:
     elapsed_time: float = 0.0
     start_time: float = 0.0
     stage: str = "scanning"  # "scanning" or "processing"
-    history: Optional[List[List[Tuple[float, int]]]] = (
-        None  # 用于存储 (timestamp, processed_files) 对
-    )
 
     @property
     def file_progress(self) -> float:
@@ -438,25 +435,28 @@ class Scanner(QObject):
 
         # 进度条更新
         self.progress.stage = "processing"
-        self.progress.processed_files = skipped_count
+        self.progress.processed_files = 0
         self.progress.duplicates_found = 0
-        self.progress.total_files = len(valid_comics)
+        self.progress.total_files = remaining_count
         self.progress.start_time = time.time()
-        self.progress.history = []
 
         # 构建漫画到重复组的字典映射
         comic_to_group_map: Dict[ComicInfo, DuplicateGroup] = {}
 
         # 对每个漫画进行重复检测
+        recall_comic_cache_keys = set()
         for comic_idx, comic in enumerate(valid_comics):
-            # 之后的漫画已跳过，停止处理
-            if comic_idx >= remaining_count:
-                logger.info("遇到已跳过的漫画，提前结束重复检测")
-                break
+            # 漫画已跳过
+            if (
+                comic.cache_key in skipped_comic_cache_keys
+                and comic.cache_key not in recall_comic_cache_keys
+            ):
+                continue
 
             # 更新进度
             self.progress.processed_files += 1
             self.progress.duplicates_found = len(duplicate_groups)
+            self.progress.total_files = remaining_count + len(recall_comic_cache_keys)
             self.progress.current_file = os.path.basename(comic.path)
             self.progress.elapsed_time = time.time() - self.progress.start_time
             self.progress_updated.emit(self.progress)
@@ -541,6 +541,13 @@ class Scanner(QObject):
                 duplicate_group = DuplicateGroup(
                     comics=similar_comics,
                     similar_hash_groups=all_similar_groups,
+                )
+
+                # 召回已跳过漫画
+                recall_comic_cache_keys.update(
+                    c.cache_key
+                    for c in duplicate_group.comics
+                    if c.cache_key in skipped_comic_cache_keys
                 )
 
                 # 合并重复组
