@@ -197,8 +197,6 @@ class MainWindow(QMainWindow):
 
         # 可折叠内容框架
         self.collapsible_frame = QFrame()
-        self.collapsible_frame.setFrameShape(QFrame.StyledPanel)
-        self.collapsible_frame.setFrameShadow(QFrame.Raised)
         collapsible_layout = QVBoxLayout(self.collapsible_frame)
         collapsible_layout.setContentsMargins(0, 0, 0, 0)
 
