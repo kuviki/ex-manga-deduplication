@@ -28,7 +28,7 @@ from PyQt5.QtWidgets import (
     QFrame,
 )
 from PyQt5.QtCore import Qt, QThread
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 from loguru import logger
 from send2trash import send2trash
 
@@ -70,6 +70,7 @@ class MainWindow(QMainWindow):
     def init_ui(self):
         """初始化用户界面"""
         self.setWindowTitle("Ex-漫画去重工具 v1.0.0")
+        self.setWindowIcon(QIcon("resources/icon.png"))
 
         # 创建中央部件
         central_widget = QWidget()
