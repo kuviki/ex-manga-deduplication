@@ -4,7 +4,6 @@
 用于显示选中漫画的图片预览
 """
 
-import numpy as np
 from typing import List, Tuple
 from PyQt5.QtWidgets import (
     QWidget,
@@ -20,7 +19,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QFont
 from loguru import logger
-from numpy.typing import NDArray
 
 from src.utils.file_utils import natural_sort_key
 
@@ -40,7 +38,7 @@ class ImageLoadThread(QThread):
     def __init__(
         self,
         comic_path: str,
-        comic_hashes: List[Tuple[str, str, NDArray[np.uint8]]],
+        comic_hashes: List[Tuple[str, str]],
         image_indices: List[int],
         max_size: tuple,
     ):
@@ -378,7 +376,7 @@ class ImagePreviewWidget(QWidget):
         image_label.setScaledContents(False)
 
         # 图片信息 （可选择复制）
-        info_text = f"图片({index}): {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
+        info_text = f"图片[{index}]: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
         info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setWordWrap(True)

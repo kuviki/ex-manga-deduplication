@@ -7,9 +7,8 @@
 import os
 import pickle
 import hashlib
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, Any, Optional
 from loguru import logger
-from numpy.typing import NDArray
 from .config_manager import HashAlgorithm
 
 
@@ -51,7 +50,7 @@ class CacheManager:
 
     def get_comic_cache(
         self, file_path: str, mtime: float, algorithm: HashAlgorithm
-    ) -> Optional[List[Tuple[str, str, NDArray]]]:
+    ) -> Optional[dict]:
         """获取漫画文件的缓存数据
 
         Args:
@@ -98,7 +97,7 @@ class CacheManager:
         file_path: str,
         mtime: float,
         algorithm: HashAlgorithm,
-        data: List[Tuple[str, str, NDArray]],
+        data: dict,
     ) -> bool:
         """设置漫画文件的缓存数据
 

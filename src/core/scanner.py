@@ -52,9 +52,8 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
-    image_hashes: List[
-        Tuple[str, str, NDArray[np.uint8]]
-    ]  # filename, hash_hex, hash_array
+    image_hashes: List[Tuple[str, str]]  # filename, hash_hex
+    image_hash_array: NDArray[np.uint64]
     cache_key: str  # 缓存键
     error: Optional[str] = None
     checked: bool = False  # 是否已检查标记
@@ -257,6 +256,7 @@ class Scanner(QObject):
                         size=size,
                         mtime=mtime,
                         image_hashes=cached_info["image_hashes"],
+                        image_hash_array=np.array(cached_info["image_hash_array"]),
                         cache_key=self.cache_manager.get_cache_key(
                             file_path, mtime, self.config.get_hash_algorithm()
                         ),
@@ -266,6 +266,7 @@ class Scanner(QObject):
             image_hashes = []
             min_width, min_height = self.config.get_min_image_resolution()
 
+            image_hash_array = []
             for filename, image_data in self.archive_reader.read_all_images(file_path):
                 # 等待暂停
                 while self.is_paused and not self.should_stop:
@@ -287,8 +288,12 @@ class Scanner(QObject):
                 # 计算哈希
                 try:
                     image_hash = self.image_hasher.calculate_hash(image_data)
-                    hash_array = imagehash.hex_to_hash(image_hash).hash.flatten()
-                    image_hashes.append((filename, image_hash, hash_array))
+                    hash_obj = imagehash.hex_to_hash(image_hash)
+                    hash_u64 = (
+                        np.packbits(hash_obj.hash, axis=1).flatten().view(np.uint64)
+                    )
+                    image_hashes.append((filename, image_hash))
+                    image_hash_array.append(hash_u64)
 
                 except Exception as e:
                     logger.warning(f"计算图片哈希失败 {file_path}/{filename}: {e}")
@@ -299,6 +304,7 @@ class Scanner(QObject):
                 size=size,
                 mtime=mtime,
                 image_hashes=image_hashes,
+                image_hash_array=np.array(image_hash_array),
                 cache_key=self.cache_manager.get_cache_key(
                     file_path, mtime, self.config.get_hash_algorithm()
                 ),
@@ -310,7 +316,10 @@ class Scanner(QObject):
                     file_path,
                     mtime,
                     self.config.get_hash_algorithm(),
-                    {"image_count": len(image_hashes), "image_hashes": image_hashes},
+                    {
+                        "image_hashes": image_hashes,
+                        "image_hash_array": image_hash_array,
+                    },
                 )
 
             return comic_info
@@ -392,29 +401,25 @@ class Scanner(QObject):
         blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
-            # 批量处理图片哈希
-            hash_arrays = np.array([h[2] for h in comic.image_hashes])
-
-            # 将哈希数组的位转换为uint64
-            hash_arrays = np.packbits(hash_arrays, axis=1).view(np.uint64)
+            hash_array = comic.image_hash_array
 
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
                 hamming_distances = np.bitwise_count(
-                    np.bitwise_xor(hash_arrays, blacklist_hashes.flatten())
+                    np.bitwise_xor(hash_array, blacklist_hashes.flatten())
                 )
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=1
                 )
                 blacklist_image_count += np.sum(blacklist_mask)
                 # 过滤掉黑名单图片
-                hash_arrays = hash_arrays[~blacklist_mask]
+                hash_array = hash_array[~blacklist_mask]
 
             # 批量添加有效哈希
-            if len(hash_arrays) > 0:
-                all_hashes.extend(hash_arrays)
-                hash_to_comic_idx.extend([comic_idx] * len(hash_arrays))
-                current_idx += len(hash_arrays)
+            if len(hash_array) > 0:
+                all_hashes.extend(hash_array)
+                hash_to_comic_idx.extend([comic_idx] * len(hash_array))
+                current_idx += len(hash_array)
 
             end_idx = current_idx
             if end_idx > start_idx:
@@ -429,7 +434,7 @@ class Scanner(QObject):
         )
 
         # 转换为numpy矩阵
-        all_hashes = np.array(all_hashes)  # shape: (total_images, 1)
+        all_hashes = np.array(all_hashes).flatten()  # shape: (total_images)
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
 
         # 计算跳过的漫画数量并更新总文件数
@@ -485,8 +490,8 @@ class Scanner(QObject):
 
             # 计算当前漫画图片与所有图片的汉明距离矩阵
             hamming_distances = np.bitwise_count(
-                np.bitwise_xor(comic_hashes, all_hashes.flatten())
-            )  # shape: (comic_images, all_images)
+                np.bitwise_xor(comic_hashes[:, np.newaxis], all_hashes)
+            )  # shape: (comic_images, all_images) TODO: 内存优化
 
             # 应用相似度阈值
             similarity_mask = hamming_distances <= similarity_threshold
@@ -528,12 +533,8 @@ class Scanner(QObject):
                         similar_comics.append(similar_comic)
 
                         for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
-                            hash1 = all_hashes[start_idx + pos_i]
-                            hash1 = np.unpackbits(hash1[np.newaxis].view(np.uint8))
-                            hash1 = str(imagehash.ImageHash(hash1))
-                            hash2 = all_hashes[similar_start_idx + pos_j]
-                            hash2 = np.unpackbits(hash2[np.newaxis].view(np.uint8))
-                            hash2 = str(imagehash.ImageHash(hash2))
+                            hash1 = comic.image_hashes[pos_i][1]
+                            hash2 = similar_comic.image_hashes[pos_j][1]
                             similarity = int(
                                 hamming_distances[pos_i, similar_start_idx + pos_j]
                             )
