@@ -12,11 +12,10 @@ from PyQt5.QtWidgets import (
     QLabel,
     QScrollArea,
     QPushButton,
-    QSpinBox,
     QFrame,
     QApplication,
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QPixmap, QFont
 from loguru import logger
 
