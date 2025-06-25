@@ -123,6 +123,12 @@ class ImagePreviewWidget(QWidget):
         self.show_duplicates_only = True  # 新增：是否只显示重复图片
         self.load_finished = False  # 新增：是否加载完成
 
+        # 分批加载相关属性
+        self.batch_size = 6  # 每批加载的图片数量
+        self.loaded_count = 0  # 已加载的图片数量
+        self.total_indices = []  # 所有要加载的图片索引
+        self.is_loading = False  # 是否正在加载
+
         self.init_ui()
 
     def init_ui(self):
@@ -152,17 +158,6 @@ class ImagePreviewWidget(QWidget):
 
         control_layout.addStretch()
 
-        # 图片数量控制（0表示无限制）
-        control_layout.addWidget(QLabel("显示图片数 (0表示无限制):"))
-
-        self.image_count_spinbox = QSpinBox()
-        self.image_count_spinbox.setRange(0, 2147483647)
-        self.image_count_spinbox.setValue(6)
-        self.image_count_spinbox.valueChanged.connect(self.on_image_count_changed)
-        control_layout.addWidget(self.image_count_spinbox)
-
-        control_layout.addStretch()
-
         # 刷新按钮
         self.refresh_btn = QPushButton("刷新")
         self.refresh_btn.clicked.connect(self.refresh_preview)
@@ -175,6 +170,11 @@ class ImagePreviewWidget(QWidget):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        # 添加滚动监听
+        self.scroll_area.verticalScrollBar().valueChanged.connect(
+            self.on_scroll_changed
+        )
 
         # 图片容器
         self.image_container = QWidget()
@@ -232,18 +232,22 @@ class ImagePreviewWidget(QWidget):
         # 清空现有图片
         self.clear_images()
 
-        # 获取预览图片尺寸
-        preview_size = self.config.get_preview_size()
+        # 重置分批加载状态
+        self.loaded_count = 0
+        self.total_indices = []
+        self.is_loading = False
 
+        # 准备要加载的图片索引
         if self.show_duplicates_only:
-            # 仅显示重复图片模式
-            self._load_duplicate_images(preview_size)
+            self._prepare_duplicate_indices()
         else:
-            # 显示全部图片模式
-            self._load_all_images(preview_size)
+            self._prepare_all_indices()
 
-    def _load_duplicate_images(self, preview_size):
-        """加载重复图片"""
+        # 开始加载第一批图片
+        self._load_next_batch()
+
+    def _prepare_duplicate_indices(self):
+        """准备重复图片的索引"""
         if not self.current_group or not self.current_group.similar_hash_groups:
             self.status_label.setText("该重复组没有相似图片")
             return
@@ -272,67 +276,88 @@ class ImagePreviewWidget(QWidget):
             self.current_comic.image_hashes,
             key=lambda x: natural_sort_key(x[0]),
         )
-        indices = []
+        self.total_indices = []
         for index, sorted_image_hash in enumerate(sorted_image_hashes):
             hash_hex = sorted_image_hash[1]
             if hash_hex in target_hashes:
-                indices.append(index)
+                self.total_indices.append(index)
 
-        # 取前N张图片索引
-        image_count = self.image_count_spinbox.value()
-        if image_count > 0:
-            indices = indices[:image_count]
+        self.status_label.setText(f"找到 {len(self.total_indices)} 张重复图片")
 
-        # 创建重复图片加载线程
-        self.load_thread = ImageLoadThread(
-            self.current_comic.path,
-            self.current_comic.image_hashes,
-            indices,
-            preview_size,
-        )
-        self.load_thread.image_loaded.connect(self.on_image_loaded)
-        self.load_thread.load_error.connect(self.on_image_load_error)
-        self.load_thread.finished.connect(self.on_load_finished)
-
-        # 显示加载状态
-        self.status_label.setText(f"正在加载 {len(indices)} 张重复图片...")
-
-        # 开始加载
-        self.load_thread.start()
-
-    def _load_all_images(self, preview_size):
-        """加载全部图片"""
-        # 计算要加载的图片索引
-        image_count = self.image_count_spinbox.value()
+    def _prepare_all_indices(self):
+        """准备全部图片的索引"""
         total_images = len(self.current_comic.image_hashes)
 
         if total_images == 0:
             self.status_label.setText("该漫画没有图片")
             return
 
-        # 均匀分布选择图片索引
-        if image_count == 0 or image_count >= total_images:
-            indices = list(range(total_images))
-        else:
-            step = total_images / image_count
-            indices = [int(i * step) for i in range(image_count)]
+        # 按顺序加载所有图片
+        self.total_indices = list(range(total_images))
+        self.status_label.setText(f"共 {len(self.total_indices)} 张图片")
+
+    def _load_next_batch(self):
+        """加载下一批图片"""
+        if self.is_loading or self.loaded_count >= len(self.total_indices):
+            return
+
+        self.is_loading = True
+
+        # 计算本批次要加载的图片索引
+        start_index = self.loaded_count
+        end_index = min(start_index + self.batch_size, len(self.total_indices))
+        batch_indices = self.total_indices[start_index:end_index]
+
+        if not batch_indices:
+            self.is_loading = False
+            return
+
+        # 获取预览图片尺寸
+        preview_size = self.config.get_preview_size()
 
         # 创建加载线程
         self.load_thread = ImageLoadThread(
             self.current_comic.path,
             self.current_comic.image_hashes,
-            indices,
+            batch_indices,
             preview_size,
         )
         self.load_thread.image_loaded.connect(self.on_image_loaded)
         self.load_thread.load_error.connect(self.on_image_load_error)
-        self.load_thread.finished.connect(self.on_load_finished)
+        self.load_thread.finished.connect(self.on_batch_load_finished)
 
         # 显示加载状态
-        self.status_label.setText(f"正在加载 {len(indices)} 张图片...")
+        self.status_label.setText(f"正在加载第 {start_index + 1}-{end_index} 张图片...")
 
         # 开始加载
         self.load_thread.start()
+
+    def on_batch_load_finished(self):
+        """处理批次加载完成"""
+        self.loaded_count = len(self.image_pixmaps)
+        total_count = len(self.total_indices)
+
+        if self.loaded_count >= total_count:
+            self.status_label.setText(f"已加载全部 {self.loaded_count} 张图片")
+        else:
+            self.status_label.setText(
+                f"已加载 {self.loaded_count}/{total_count} 张图片"
+            )
+
+        self.is_loading = False
+        self.load_finished = True
+
+    def on_scroll_changed(self, value):
+        """滚动条变化时的处理"""
+        if not self.total_indices or self.is_loading:
+            return
+
+        # 检查是否滚动到底部附近（距离底部小于100像素时开始加载）
+        scrollbar = self.scroll_area.verticalScrollBar()
+        if scrollbar.maximum() - value < 100 and self.loaded_count < len(
+            self.total_indices
+        ):
+            self._load_next_batch()
 
     def on_image_loaded(
         self, index: int, image_hash: str, pixmap: QPixmap, filename: str
@@ -350,12 +375,6 @@ class ImagePreviewWidget(QWidget):
         """处理图片加载错误"""
         logger.warning(f"图片 {index} 加载失败: {error_message}")
         self.add_error_placeholder(index, error_message)
-
-    def on_load_finished(self):
-        """处理加载完成"""
-        loaded_count = len(self.image_pixmaps)
-        self.status_label.setText(f"已加载 {loaded_count} 张图片")
-        self.load_finished = True
 
     def add_image_to_display(
         self, index: int, image_hash: str, pixmap: QPixmap, filename: str
@@ -493,6 +512,11 @@ class ImagePreviewWidget(QWidget):
         # 清空缓存
         self.image_pixmaps.clear()
 
+        # 重置分批加载状态
+        self.loaded_count = 0
+        self.total_indices = []
+        self.is_loading = False
+
     def clear(self):
         """清空预览"""
         # 停止加载线程
@@ -511,18 +535,6 @@ class ImagePreviewWidget(QWidget):
         """刷新预览"""
         if self.current_comic:
             self.load_preview_images()
-
-    def on_image_count_changed(self, value: int):
-        """图片数量改变时的处理"""
-        if self.current_comic:
-            # 延迟刷新，避免频繁操作
-            if hasattr(self, "_refresh_timer"):
-                self._refresh_timer.stop()
-
-            self._refresh_timer = QTimer()
-            self._refresh_timer.setSingleShot(True)
-            self._refresh_timer.timeout.connect(self.refresh_preview)
-            self._refresh_timer.start(500)  # 500ms延迟
 
     def _format_file_size(self, size_bytes: int) -> str:
         """格式化文件大小"""
