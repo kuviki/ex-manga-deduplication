@@ -158,24 +158,6 @@ class ConfigManager:
         resolution = self.get("min_image_resolution", {"width": 100, "height": 100})
         return resolution.get("width", 100), resolution.get("height", 100)
 
-    def get_supported_formats(self) -> list:
-        """获取支持的压缩包格式"""
-        return [".zip", ".rar", ".cbr", ".cbz"]
-
-    def get_supported_image_formats(self) -> list:
-        """获取支持的图片格式"""
-        return [
-            ".jpg",
-            ".jpeg",
-            ".jpe",
-            ".jif",
-            ".jfif",
-            ".png",
-            ".gif",
-            ".bmp",
-            ".webp",
-        ]
-
     def is_cache_enabled(self) -> bool:
         """是否启用缓存"""
         return self.get("enable_cache", True)

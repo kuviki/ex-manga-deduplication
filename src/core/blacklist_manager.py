@@ -10,6 +10,7 @@ from loguru import logger
 from PIL import Image
 
 from src.core.config_manager import ConfigManager
+from src.utils.file_utils import is_supported_image
 from .image_hash import ImageHasher
 from .cache_manager import CacheManager
 
@@ -52,8 +53,7 @@ class BlacklistManager:
 
                     # 检查是否为文件且为支持的图片格式
                     if os.path.isfile(file_path):
-                        _, ext = os.path.splitext(filename.lower())
-                        if ext in self.config.get_supported_image_formats():
+                        if is_supported_image(file_path):
                             try:
                                 # 打开图片并计算哈希
                                 with Image.open(file_path) as img:
@@ -130,8 +130,7 @@ class BlacklistManager:
         ):
             for filename in os.listdir(self.blacklist_folder):
                 if os.path.isfile(os.path.join(self.blacklist_folder, filename)):
-                    _, ext = os.path.splitext(filename.lower())
-                    if ext in self.config.get_supported_image_formats():
+                    if is_supported_image(filename):
                         folder_file_count += 1
 
         return {

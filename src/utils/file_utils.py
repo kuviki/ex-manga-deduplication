@@ -14,20 +14,24 @@ from loguru import logger
 
 def is_supported_archive(file_path: str) -> bool:
     """检查文件是否为支持的压缩格式"""
-    if not os.path.isfile(file_path):
-        return False
-
     ext = os.path.splitext(file_path)[1].lower()
     return ext in [".zip", ".rar", ".cbz", ".cbr"]
 
 
 def is_supported_image(file_path: str) -> bool:
     """检查文件是否为支持的图片格式"""
-    if not os.path.isfile(file_path):
-        return False
-
     ext = os.path.splitext(file_path)[1].lower()
-    return ext in [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif"]
+    return ext in [
+        ".jpg",
+        ".jpeg",
+        ".jpe",
+        ".jif",
+        ".jfif",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".webp",
+    ]
 
 
 def get_file_size(file_path: str) -> int:

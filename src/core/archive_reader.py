@@ -11,44 +11,17 @@ from typing import List, Dict, Generator, Tuple, Optional
 from io import BytesIO
 from loguru import logger
 from PIL import Image
-from ..utils.file_utils import natural_sort_key
+from ..utils.file_utils import natural_sort_key, is_supported_image
 
 
 class ArchiveReader:
     """压缩包读取器"""
 
-    def __init__(self, supported_image_formats: List[str] = None):
-        if supported_image_formats is None:
-            supported_image_formats = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
-
-        self.supported_image_formats = [fmt.lower() for fmt in supported_image_formats]
+    def __init__(self):
+        pass
 
         # 设置RAR工具路径（如果需要）
         # rarfile.UNRAR_TOOL = "path/to/unrar.exe"  # Windows
-
-    def is_supported_archive(self, file_path: str) -> bool:
-        """检查是否为支持的压缩包格式
-
-        Args:
-            file_path: 文件路径
-
-        Returns:
-            bool: 是否支持
-        """
-        ext = os.path.splitext(file_path)[1].lower()
-        return ext in [".zip", ".rar", ".cbr", ".cbz"]
-
-    def is_image_file(self, filename: str) -> bool:
-        """检查是否为图片文件
-
-        Args:
-            filename: 文件名
-
-        Returns:
-            bool: 是否为图片文件
-        """
-        ext = os.path.splitext(filename)[1].lower()
-        return ext in self.supported_image_formats
 
     def get_image_files(self, archive_path: str) -> List[str]:
         """获取压缩包中的所有图片文件列表
@@ -65,13 +38,13 @@ class ArchiveReader:
             if archive_path.lower().endswith((".zip", ".cbz")):
                 with zipfile.ZipFile(archive_path, "r") as archive:
                     for filename in archive.namelist():
-                        if self.is_image_file(filename) and not filename.endswith("/"):
+                        if is_supported_image(filename) and not filename.endswith("/"):
                             image_files.append(filename)
 
             elif archive_path.lower().endswith((".rar", ".cbr")):
                 with rarfile.RarFile(archive_path, "r") as archive:
                     for filename in archive.namelist():
-                        if self.is_image_file(filename) and not filename.endswith("/"):
+                        if is_supported_image(filename) and not filename.endswith("/"):
                             image_files.append(filename)
 
             # 自然排序

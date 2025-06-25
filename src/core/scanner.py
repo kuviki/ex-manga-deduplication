@@ -17,6 +17,8 @@ from loguru import logger
 from PyQt5.QtCore import QObject, pyqtSignal
 from numpy.typing import NDArray
 
+from src.utils.file_utils import is_supported_archive
+
 from .config_manager import ConfigManager
 from .archive_reader import ArchiveReader
 from .image_hash import ImageHasher
@@ -83,7 +85,7 @@ class Scanner(QObject):
     def __init__(self, config_manager: ConfigManager):
         super().__init__()
         self.config = config_manager
-        self.archive_reader = ArchiveReader(self.config.get_supported_image_formats())
+        self.archive_reader = ArchiveReader()
         self.image_hasher = ImageHasher(self.config.get_hash_algorithm())
         self.cache_manager = CacheManager(self.config.get_cache_dir())
         self.blacklist_manager = BlacklistManager(
@@ -182,11 +184,10 @@ class Scanner(QObject):
     def _find_comic_files(self, directory: str) -> List[str]:
         """查找目录中的所有漫画文件"""
         comic_files = []
-        supported_formats = self.config.get_supported_formats()
 
         for root, _dirs, files in os.walk(directory):
             for file in files:
-                if any(file.lower().endswith(fmt) for fmt in supported_formats):
+                if is_supported_archive(file):
                     comic_files.append(os.path.join(root, file))
 
         logger.info(f"找到 {len(comic_files)} 个漫画文件")
