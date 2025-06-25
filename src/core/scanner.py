@@ -490,30 +490,43 @@ class Scanner(QObject):
             start_idx, end_idx = comic_hash_ranges[comic_idx]
             comic_hashes = all_hashes[start_idx:end_idx]  # 当前漫画的哈希矩阵
 
-            # 计算当前漫画图片与所有图片的汉明距离矩阵
-            hamming_distances = np.bitwise_count(
-                np.bitwise_xor(comic_hashes[:, np.newaxis], all_hashes)
-            )  # shape: (comic_images, all_images) TODO: 内存优化
+            # 逐张计算汉明距离以优化内存占用
+            similar_comic_counts = {}
+            similarity_results = {}  # 存储每张图片的相似性结果 {image_idx: [(all_hash_idx, distance)]}
 
-            # 应用相似度阈值
-            similarity_mask = hamming_distances <= similarity_threshold
+            for img_idx, comic_hash in enumerate(comic_hashes):
+                # 计算当前图片与所有图片的汉明距离
+                hamming_distances = np.bitwise_count(
+                    np.bitwise_xor(comic_hash, all_hashes)
+                )
 
-            # 获取相似图片对应的漫画索引
-            similar_image_mask = np.any(similarity_mask, axis=0)
-            similar_comic_indices = hash_to_comic_idx[similar_image_mask]
+                # 应用相似度阈值
+                similarity_mask = hamming_distances <= similarity_threshold
+                similar_indices = np.where(similarity_mask)[0]
 
-            # 统计每个漫画的相似图片数量
-            unique_comics, counts = np.unique(similar_comic_indices, return_counts=True)
+                # 存储相似性结果
+                similarity_results[img_idx] = [
+                    (idx, hamming_distances[idx]) for idx in similar_indices
+                ]
 
-            # 排除当前漫画
-            counts = counts[unique_comics != comic_idx]
-            unique_comics = unique_comics[unique_comics != comic_idx]
+                # 获取相似图片对应的漫画索引并统计
+                similar_comic_indices = hash_to_comic_idx[similar_indices]
+                for similar_comic_idx in similar_comic_indices:
+                    if similar_comic_idx != comic_idx:  # 排除当前漫画
+                        similar_comic_counts[similar_comic_idx] = (
+                            similar_comic_counts.get(int(similar_comic_idx), 0) + 1
+                        )
+
+            # 转换为numpy数组格式以保持兼容性
+            counts = np.array(list(similar_comic_counts.values()))
 
             # 更新缓存
             similar_comic_cache_dict[comic.cache_key] = counts
 
             # 找到满足最小相似图片数量要求的漫画
-            valid_similar_comics = unique_comics[counts >= min_similar_images]
+            valid_similar_comics = [
+                k for k, v in similar_comic_counts.items() if v >= min_similar_images
+            ]
 
             if len(valid_similar_comics) > 0:
                 # 构建重复组
@@ -525,26 +538,37 @@ class Scanner(QObject):
                     similar_start_idx, similar_end_idx = comic_hash_ranges[
                         similar_comic_idx
                     ]
-                    image_mask = similarity_mask[:, similar_start_idx:similar_end_idx]
-                    image_positions = np.nonzero(image_mask)
+
+                    # 从similarity_results中收集相似图片对
+                    similar_pairs = []
+                    for img_idx, similar_list in similarity_results.items():
+                        for all_hash_idx, distance in similar_list:
+                            # 检查是否属于目标漫画
+                            if similar_start_idx <= all_hash_idx < similar_end_idx:
+                                similar_pairs.append(
+                                    (
+                                        img_idx,
+                                        all_hash_idx - similar_start_idx,
+                                        distance,
+                                    )
+                                )
 
                     # 确保当前漫画也满足最小相似图片数量要求
-                    current_comic_similar_count = len(np.unique(image_positions[0]))
+                    current_comic_similar_count = len(
+                        set(pair[0] for pair in similar_pairs)
+                    )
                     if current_comic_similar_count >= min_similar_images:
                         similar_comic = valid_comics[similar_comic_idx]
                         similar_comics.append(similar_comic)
 
-                        for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
+                        for pos_i, pos_j, similarity in similar_pairs:
                             hash1 = comic.image_hashes[pos_i][1]
                             hash2 = similar_comic.image_hashes[pos_j][1]
-                            similarity = int(
-                                hamming_distances[pos_i, similar_start_idx + pos_j]
-                            )
 
                             # 确保哈希顺序一致
                             if hash1 > hash2:
                                 hash1, hash2 = hash2, hash1
-                            all_similar_groups.add((hash1, hash2, similarity))
+                            all_similar_groups.add((hash1, hash2, int(similarity)))
 
                 if len(similar_comics) <= 1:
                     continue
