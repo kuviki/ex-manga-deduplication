@@ -63,12 +63,12 @@ class MainWindow(QMainWindow):
         self.scan_thread = None
         self.current_duplicates = []
 
-        # 初始化Windows任务栏进度
-        self.taskbar_progress = PyTaskbar.Progress(int(self.winId()))
-
         self.init_ui()
         self.load_settings()
         self.connect_signals()
+
+        # 初始化Windows任务栏进度
+        self.taskbar_progress = PyTaskbar.Progress(int(self.winId()))
 
     def init_ui(self):
         """初始化用户界面"""
