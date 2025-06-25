@@ -7,6 +7,7 @@
 import os
 import time
 import pickle
+import traceback
 import numpy as np
 import imagehash
 from typing import Dict, List, Set, Tuple, Optional
@@ -139,7 +140,7 @@ class Scanner(QObject):
             self.scan_completed.emit(duplicate_groups)
 
         except Exception as e:
-            logger.error(f"扫描过程中发生错误: {e}")
+            logger.error(f"扫描过程中发生错误: {traceback.format_exc()}")
             self.scan_error.emit(str(e))
         finally:
             self.is_scanning = False
@@ -213,7 +214,9 @@ class Scanner(QObject):
                     self.progress_updated.emit(self.progress)
 
                 except Exception as e:
-                    logger.error(f"处理漫画文件失败 {file_path}: {e}")
+                    logger.error(
+                        f"处理漫画文件失败 {file_path}: {traceback.format_exc()}"
+                    )
                     self.progress.errors += 1
 
         return comic_infos
@@ -375,7 +378,7 @@ class Scanner(QObject):
                 blacklist_hashes_array.append(hash_array.flatten())
             blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
             del blacklist_hashes_array
-        blacklist_hashes_inv = 1 - blacklist_hashes
+            blacklist_hashes_inv = 1 - blacklist_hashes
 
         # 构建全局哈希数组和索引映射
         all_hashes = []
