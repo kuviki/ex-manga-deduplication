@@ -438,7 +438,9 @@ class MainWindow(QMainWindow):
                 f"{processed_text} {progress.processed_files} 个文件{duplicates_text} | 耗时: {elapsed_str}"
             )
 
-    def on_scan_completed(self, duplicate_groups: List[DuplicateGroup]):
+    def on_scan_completed(
+        self, duplicate_groups: List[DuplicateGroup], elapsed_time: float
+    ):
         """处理扫描完成"""
         self.current_duplicates = duplicate_groups
         self.duplicate_list.set_duplicates(duplicate_groups)
@@ -446,7 +448,7 @@ class MainWindow(QMainWindow):
         # 更新统计信息
         total_comics = sum(len(group.comics) for group in duplicate_groups)
         self.stats_label.setText(
-            f"找到 {len(duplicate_groups)} 组重复漫画，共 {total_comics} 个文件"
+            f"找到 {len(duplicate_groups)} 组重复漫画，共 {total_comics} 个文件，耗时 {elapsed_time:.0f} 秒"
         )
 
         self.reset_scan_ui()
@@ -456,7 +458,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "扫描完成",
-                f"扫描完成！\n找到 {len(duplicate_groups)} 组重复漫画，共 {total_comics} 个文件。",
+                f"扫描完成！\n找到 {len(duplicate_groups)} 组重复漫画，共 {total_comics} 个文件，耗时 {elapsed_time:.0f} 秒。",
             )
         else:
             QMessageBox.information(self, "扫描完成", "扫描完成！未找到重复漫画。")

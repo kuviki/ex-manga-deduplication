@@ -76,7 +76,7 @@ class Scanner(QObject):
 
     # 信号定义
     progress_updated = pyqtSignal(ScanProgress)
-    scan_completed = pyqtSignal(list)  # List[DuplicateGroup]
+    scan_completed = pyqtSignal(list, float)  # List[DuplicateGroup], elapsed_time
     scan_error = pyqtSignal(str)
     scan_paused = pyqtSignal()
     scan_resumed = pyqtSignal()
@@ -118,9 +118,10 @@ class Scanner(QObject):
                 self.scan_error.emit("未找到支持的漫画文件")
                 return
 
+            start_time = time.time()
             self.progress = ScanProgress(total_files=len(comic_files))
             self.progress_updated.emit(self.progress)
-            self.progress.start_time = time.time()
+            self.progress.start_time = start_time
 
             # 扫描漫画文件
             comic_infos = self._process_comic_files(comic_files)
@@ -136,8 +137,11 @@ class Scanner(QObject):
             self.progress.elapsed_time = time.time() - self.progress.start_time
             self.progress_updated.emit(self.progress)
 
-            logger.info(f"扫描完成，找到 {len(duplicate_groups)} 组重复漫画")
-            self.scan_completed.emit(duplicate_groups)
+            elapsed_time = time.time() - start_time
+            logger.info(
+                f"扫描完成，找到 {len(duplicate_groups)} 组重复漫画，耗时 {elapsed_time:.0f} 秒"
+            )
+            self.scan_completed.emit(duplicate_groups, elapsed_time)
 
         except Exception as e:
             logger.error(f"扫描过程中发生错误: {traceback.format_exc()}")
@@ -213,7 +217,7 @@ class Scanner(QObject):
                     self.progress.elapsed_time = time.time() - self.progress.start_time
                     self.progress_updated.emit(self.progress)
 
-                except Exception as e:
+                except Exception:
                     logger.error(
                         f"处理漫画文件失败 {file_path}: {traceback.format_exc()}"
                     )
@@ -374,11 +378,10 @@ class Scanner(QObject):
             for hash_hex in blacklist_hashes:
                 # 将哈希字符串转换为numpy数组
                 hash_obj = imagehash.hex_to_hash(hash_hex)
-                hash_array = np.array(hash_obj.hash, dtype=np.uint8)
-                blacklist_hashes_array.append(hash_array.flatten())
-            blacklist_hashes = np.array(blacklist_hashes_array, dtype=np.uint8)
+                hash_u64 = np.packbits(hash_obj.hash, axis=1).flatten().view(np.uint64)
+                blacklist_hashes_array.append(hash_u64)
+            blacklist_hashes = np.array(blacklist_hashes_array)
             del blacklist_hashes_array
-            blacklist_hashes_inv = 1 - blacklist_hashes
 
         # 构建全局哈希数组和索引映射
         all_hashes = []
@@ -392,13 +395,16 @@ class Scanner(QObject):
             # 批量处理图片哈希
             hash_arrays = np.array([h[2] for h in comic.image_hashes])
 
+            # 将哈希数组的位转换为uint64
+            hash_arrays = np.packbits(hash_arrays, axis=1).view(np.uint64)
+
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
-                hamming_distances = np.dot(blacklist_hashes, ~hash_arrays.T) + np.dot(
-                    blacklist_hashes_inv, hash_arrays.T
+                hamming_distances = np.bitwise_count(
+                    np.bitwise_xor(hash_arrays, blacklist_hashes.flatten())
                 )
                 blacklist_mask = np.any(
-                    hamming_distances <= similarity_threshold, axis=0
+                    hamming_distances <= similarity_threshold, axis=1
                 )
                 blacklist_image_count += np.sum(blacklist_mask)
                 # 过滤掉黑名单图片
@@ -423,8 +429,7 @@ class Scanner(QObject):
         )
 
         # 转换为numpy矩阵
-        all_hashes = np.array(all_hashes)  # shape: (total_images, hash_bits)
-        all_hashes_inv = ~all_hashes
+        all_hashes = np.array(all_hashes)  # shape: (total_images, 1)
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
 
         # 计算跳过的漫画数量并更新总文件数
@@ -476,13 +481,11 @@ class Scanner(QObject):
                 continue
 
             start_idx, end_idx = comic_hash_ranges[comic_idx]
-            comic_hashes = all_hashes[start_idx:end_idx].astype(
-                np.uint8
-            )  # 当前漫画的哈希矩阵
+            comic_hashes = all_hashes[start_idx:end_idx]  # 当前漫画的哈希矩阵
 
-            # 计算当前漫画图片与后续图片的汉明距离矩阵
-            hamming_distances = np.dot(comic_hashes, all_hashes_inv.T) + np.dot(
-                1 - comic_hashes, all_hashes.T
+            # 计算当前漫画图片与所有图片的汉明距离矩阵
+            hamming_distances = np.bitwise_count(
+                np.bitwise_xor(comic_hashes, all_hashes.flatten())
             )  # shape: (comic_images, all_images)
 
             # 应用相似度阈值
@@ -526,8 +529,10 @@ class Scanner(QObject):
 
                         for pos_i, pos_j in zip(image_positions[0], image_positions[1]):
                             hash1 = all_hashes[start_idx + pos_i]
+                            hash1 = np.unpackbits(hash1[np.newaxis].view(np.uint8))
                             hash1 = str(imagehash.ImageHash(hash1))
                             hash2 = all_hashes[similar_start_idx + pos_j]
+                            hash2 = np.unpackbits(hash2[np.newaxis].view(np.uint8))
                             hash2 = str(imagehash.ImageHash(hash2))
                             similarity = int(
                                 hamming_distances[pos_i, similar_start_idx + pos_j]
