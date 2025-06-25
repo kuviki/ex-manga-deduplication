@@ -48,7 +48,7 @@ class ConfigManager:
                 HashAlgorithm.WAVELET.value: 5,
             },
             # 重复检测设置
-            "min_similar_images": 3,
+            "min_similar_images": 5,
             "min_image_resolution": {"width": 100, "height": 100},
             "comic_image_count_range": {
                 "min": 1,

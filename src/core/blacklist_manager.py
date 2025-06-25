@@ -18,13 +18,17 @@ class BlacklistManager:
     """黑名单管理器"""
 
     def __init__(
-        self, blacklist_folder: str, hasher: ImageHasher, config: ConfigManager
+        self,
+        blacklist_folder: str,
+        hasher: ImageHasher,
+        config: ConfigManager,
+        cache_manager: CacheManager,
     ):
         self.blacklist_folder = blacklist_folder
         self.config = config
         self.hasher = hasher
+        self.cache_manager = cache_manager
         self.blacklist_hashes: Set[str] = set()
-        self.cache_manager = CacheManager("cache")
         self.load_blacklist()
 
     def load_blacklist(self) -> None:

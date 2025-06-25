@@ -85,10 +85,13 @@ class Scanner(QObject):
         self.config = config_manager
         self.archive_reader = ArchiveReader(self.config.get_supported_image_formats())
         self.image_hasher = ImageHasher(self.config.get_hash_algorithm())
-        self.blacklist_manager = BlacklistManager(
-            self.config.get_blacklist_folder(), self.image_hasher, config_manager
-        )
         self.cache_manager = CacheManager(self.config.get_cache_dir())
+        self.blacklist_manager = BlacklistManager(
+            self.config.get_blacklist_folder(),
+            self.image_hasher,
+            config_manager,
+            self.cache_manager,
+        )
 
         self.is_scanning = False
         self.is_paused = False
