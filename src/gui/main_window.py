@@ -9,7 +9,6 @@ import time
 from typing import List
 from datetime import timedelta
 from PyQt5.QtWidgets import (
-    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -29,6 +28,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QFont, QIcon
+import PyTaskbar
 from loguru import logger
 from send2trash import send2trash
 
@@ -62,6 +62,9 @@ class MainWindow(QMainWindow):
         self.scanner = Scanner(self.config)
         self.scan_thread = None
         self.current_duplicates = []
+
+        # 初始化Windows任务栏进度
+        self.taskbar_progress = PyTaskbar.Progress(int(self.winId()))
 
         self.init_ui()
         self.load_settings()
@@ -398,6 +401,9 @@ class MainWindow(QMainWindow):
         # 更新进度条
         self.progress_bar.setValue(int(progress.file_progress))
 
+        # 更新Windows任务栏进度
+        self.taskbar_progress.set_progress(int(progress.file_progress))
+
         # 更新进度标签
         if progress.stage == "scanning":
             progress_text = "扫描中"
@@ -445,6 +451,9 @@ class MainWindow(QMainWindow):
         self.current_duplicates = duplicate_groups
         self.duplicate_list.set_duplicates(duplicate_groups)
 
+        # 重置Windows任务栏进度
+        self.taskbar_progress.flash_done()
+
         # 更新统计信息
         total_comics = sum(len(group.comics) for group in duplicate_groups)
         self.stats_label.setText(
@@ -453,7 +462,6 @@ class MainWindow(QMainWindow):
 
         self.reset_scan_ui()
 
-        QApplication.alert(self)
         if duplicate_groups:
             QMessageBox.information(
                 self,

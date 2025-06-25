@@ -1,5 +1,6 @@
 # GUI framework
 PyQt5>=5.15.0
+PyTaskbar>=0.1.0
 
 # Image processing
 Pillow>=9.0.0
