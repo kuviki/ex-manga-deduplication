@@ -245,19 +245,18 @@ class DuplicateListWidget(QWidget):
             lambda: self.open_file_location(comic.path)
         )
 
-        # 用漫画查看器打开
-        viewer_path = self.config.get_comic_viewer_path()
-        if viewer_path and os.path.exists(viewer_path):
-            open_viewer_action = menu.addAction("用漫画查看器打开")
-            open_viewer_action.triggered.connect(
-                lambda: self.open_with_viewer(comic.path)
-            )
-
         # 用默认程序打开
         open_default_action = menu.addAction("用默认程序打开")
         open_default_action.triggered.connect(
             lambda: self.open_with_default(comic.path)
         )
+
+        # 用漫画查看器打开
+        open_viewer_action = menu.addAction("用漫画查看器打开")
+        open_viewer_action.triggered.connect(lambda: self.open_with_viewer(comic.path))
+        viewer_path = self.config.get_comic_viewer_path()
+        if not viewer_path or not os.path.exists(viewer_path):
+            open_viewer_action.setDisabled(True)
 
         menu.addSeparator()
 
