@@ -260,16 +260,33 @@ class DuplicateListWidget(QWidget):
 
         menu.addSeparator()
 
-        # 标记为已检查/取消标记
-        if comic.checked:
-            uncheck_mark_action = menu.addAction("取消标记")
+        # 标记操作 - 同时显示两个选项
+        selected_items = self._get_selected_comic_items()
+        if len(selected_items) > 1:
+            # 批量标记操作
+            check_mark_action = menu.addAction(
+                f"标记为已检查 ({len(selected_items)}个文件)"
+            )
+            check_mark_action.triggered.connect(
+                lambda: self._batch_update_checked_state(selected_items, True)
+            )
+
+            uncheck_mark_action = menu.addAction(
+                f"取消标记 ({len(selected_items)}个文件)"
+            )
             uncheck_mark_action.triggered.connect(
-                lambda: self._update_comic_checked_state(item, comic, False)
+                lambda: self._batch_update_checked_state(selected_items, False)
             )
         else:
+            # 单个文件标记操作
             check_mark_action = menu.addAction("标记为已检查")
             check_mark_action.triggered.connect(
                 lambda: self._update_comic_checked_state(item, comic, True)
+            )
+
+            uncheck_mark_action = menu.addAction("取消标记")
+            uncheck_mark_action.triggered.connect(
+                lambda: self._update_comic_checked_state(item, comic, False)
             )
 
         menu.addSeparator()
@@ -446,6 +463,38 @@ class DuplicateListWidget(QWidget):
                         selected_paths.append(data["comic"].path)
 
         return selected_paths
+
+    def _get_selected_comic_items(self) -> List[QTreeWidgetItem]:
+        """获取当前选中的漫画项目列表"""
+
+        comic_items = []
+        for item in self.tree_widget.selectedItems():
+            # 过滤出类型为"comic"的项
+            data = item.data(0, Qt.UserRole)
+            if data and data["type"] == "comic":
+                comic_items.append(item)
+        return comic_items
+
+    def _batch_update_checked_state(
+        self, selected_items: List[QTreeWidgetItem], checked: bool
+    ):
+        """批量更新漫画的已检查状态"""
+        for item in selected_items:
+            data = item.data(0, Qt.UserRole)
+            if data and data["type"] == "comic":
+                comic = data["comic"]
+                comic.checked = checked
+
+                if comic.checked:
+                    self._checked_comic_paths.add(comic.path)
+                    item.setBackground(0, QBrush(QColor(220, 255, 220)))  # 浅绿色背景
+                else:
+                    self._checked_comic_paths.discard(comic.path)
+                    item.setBackground(0, QBrush(QColor(255, 255, 255)))  # 白色背景
+
+        # 持久化已检查的漫画路径
+        self.config.set_checked_comic_paths(list(self._checked_comic_paths))
+        self.config.save_config()
 
     def _update_comic_checked_state(
         self, item: QTreeWidgetItem, comic: object, checked: Optional[bool] = None
