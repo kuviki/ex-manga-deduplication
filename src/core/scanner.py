@@ -54,7 +54,7 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
-    image_hashes: List[Tuple[str, str]]  # filename, hash_hex
+    image_hashes: List[Tuple[str, str]]  # [(filename, hash_hex)]
     image_hash_array: NDArray[np.uint64]
     cache_key: str  # 缓存键
     error: Optional[str] = None
@@ -69,6 +69,14 @@ class DuplicateGroup:
     """重复漫画组"""
 
     comics: List[ComicInfo]
+    similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
+
+
+@dataclass
+class CachedDuplicateGroup:
+    """缓存重复漫画组"""
+
+    comic_cache_keys: List[str]
     similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
 
 
@@ -230,12 +238,28 @@ class Scanner(QObject):
 
         return comic_infos
 
-    def _persist_cache_keys(self, similar_comic_cache_dict: dict):
-        """持久化缓存键"""
+    def _persist_index(
+        self,
+        similar_comic_cache_dict: dict,
+        duplicate_groups: List[DuplicateGroup],
+    ):
+        """持久化索引"""
+        cached_duplicate_groups = []
+        for group in duplicate_groups:
+            cache_group = CachedDuplicateGroup(
+                comic_cache_keys=[comic.cache_key for comic in group.comics],
+                similar_hash_groups=group.similar_hash_groups,
+            )
+            cached_duplicate_groups.append(cache_group)
+
         try:
+            cache_data = {
+                "similar_comic_cache": similar_comic_cache_dict,
+                "cached_duplicate_groups": cached_duplicate_groups,
+            }
             with open("index.db", "wb") as f:
                 pickle.dump(
-                    similar_comic_cache_dict,
+                    cache_data,
                     f,
                     protocol=pickle.HIGHEST_PROTOCOL,
                 )
@@ -342,13 +366,6 @@ class Scanner(QObject):
         min_similar_images = self.config.get_min_similar_images()
         min_image_count, max_image_count = self.config.get_comic_image_count_range()
 
-        # 加载缓存
-        try:
-            with open("index.db", "rb") as f:
-                similar_comic_cache_dict: Dict[str, NDArray[np.int64]] = pickle.load(f)
-        except Exception:
-            similar_comic_cache_dict = dict()
-
         # 过滤有效的漫画（包括图片数量范围过滤）
         valid_comics: List[ComicInfo] = []
         filtered_count = 0
@@ -374,8 +391,111 @@ class Scanner(QObject):
 
         logger.info(f"开始检测 {len(valid_comics)} 个漫画的重复")
 
-        # 从缓存中筛选出跳过的漫画
+        # 生成黑名单图片哈希
+        blacklist_hashes = self.blacklist_manager.get_all_hashes()
+        if blacklist_hashes:
+            blacklist_hashes_array = []
+            for hash_hex in blacklist_hashes:
+                # 将哈希字符串转换为numpy数组
+                hash_obj = imagehash.hex_to_hash(hash_hex)
+                hash_u64 = np.packbits(hash_obj.hash, axis=1).flatten().view(np.uint64)
+                blacklist_hashes_array.append(hash_u64)
+            blacklist_hashes = np.array(blacklist_hashes_array).flatten()
+            del blacklist_hashes_array
+
+        logger.info(f"加载了 {len(blacklist_hashes)} 个黑名单图片哈希")
+
+        # 加载索引
+        similar_comic_cache_dict: Dict[str, NDArray[np.int64]] = {}
+        cached_duplicate_groups: List[CachedDuplicateGroup] = []
+        try:
+            with open("index.db", "rb") as f:
+                cache_data = pickle.load(f)
+                similar_comic_cache_dict = cache_data.get("similar_comic_cache", {})
+                cached_duplicate_groups = cache_data.get("cached_duplicate_groups", [])
+        except Exception:
+            logger.debug("加载索引 index.db 失败")
+
+        # 验证缓存的重复组并提取有效的跳过漫画
+        valid_cached_groups = []
         skipped_comic_cache_keys = set()
+
+        # 创建 valid_comics 的 cache_key 到 comic 的映射
+        valid_comic_map = {comic.cache_key: comic for comic in valid_comics}
+
+        for group in cached_duplicate_groups:
+            # 检查组中的漫画是否仍然存在
+            valid_comics_in_group: List[ComicInfo] = []
+            for cache_key in group.comic_cache_keys:
+                if cache_key in valid_comic_map:
+                    # 使用当前的 comic 信息
+                    valid_comics_in_group.append(valid_comic_map[cache_key])
+
+            if len(valid_comics_in_group) < 2:
+                continue  # 组中有效漫画少于2个，跳过
+
+            # 根据相似度阈值过滤哈希对
+            valid_similar_hashes = set()
+            valid_similar_hash_groups = []
+            for hash1, hash2, distance in group.similar_hash_groups:
+                if distance <= similarity_threshold:
+                    if len(blacklist_hashes) == 0:
+                        valid_similar_hash_groups.append((hash1, hash2, distance))
+                        continue
+
+                    # 检查是否在黑名单中
+                    hash1_obj = imagehash.hex_to_hash(hash1)
+                    hash1_u64 = (
+                        np.packbits(hash1_obj.hash, axis=1).flatten().view(np.uint64)
+                    )
+                    hash2_obj = imagehash.hex_to_hash(hash2)
+                    hash2_u64 = (
+                        np.packbits(hash2_obj.hash, axis=1).flatten().view(np.uint64)
+                    )
+                    hash_u64 = np.stack((hash1_u64, hash2_u64), axis=0)
+
+                    # 批量计算黑名单距离
+                    hamming_distances = np.bitwise_count(
+                        np.bitwise_xor(hash_u64, blacklist_hashes)
+                    )
+                    if np.all(hamming_distances > similarity_threshold):
+                        valid_similar_hashes.add(hash1)
+                        valid_similar_hashes.add(hash2)
+                        valid_similar_hash_groups.append((hash1, hash2, distance))
+
+            # 检查是否满足最小相似图片数量要求
+            # 统计每个漫画的相似图片数量
+            valid_comics_in_group2 = []
+            for comic in valid_comics_in_group:
+                similar_count = 0
+                for _, image_hash in comic.image_hashes:
+                    if image_hash in valid_similar_hashes:
+                        similar_count += 1
+                if similar_count >= min_similar_images:
+                    valid_comics_in_group2.append(comic)
+
+            if len(valid_comics_in_group2) < 2:
+                continue  # 组中有效漫画少于2个，跳过
+
+            # 更新组信息
+            valid_cached_groups.append(
+                DuplicateGroup(
+                    comics=valid_comics_in_group2,
+                    similar_hash_groups=valid_similar_hash_groups,
+                )
+            )
+
+            # 将这些漫画的 cache_key 加入到跳过列表
+            skipped_comic_cache_keys.update(
+                comic.cache_key for comic in valid_comics_in_group2
+            )
+
+        # 将有效的缓存重复组加入到结果中
+        duplicate_groups.extend(valid_cached_groups)
+
+        logger.info(f"从缓存中加载了 {len(valid_cached_groups)} 个有效重复组")
+
+        # 从缓存中筛选出其他跳过的漫画
         for cache_key, similar_image_counts in similar_comic_cache_dict.items():
             if np.all(similar_image_counts < min_similar_images):
                 skipped_comic_cache_keys.add(cache_key)
@@ -386,21 +506,10 @@ class Scanner(QObject):
                 key=lambda x: 1 if x.cache_key in skipped_comic_cache_keys else 0
             )
 
-        # 生成黑名单图片哈希
-        blacklist_hashes = self.blacklist_manager.get_all_hashes()
-        if blacklist_hashes:
-            blacklist_hashes_array = []
-            for hash_hex in blacklist_hashes:
-                # 将哈希字符串转换为numpy数组
-                hash_obj = imagehash.hex_to_hash(hash_hex)
-                hash_u64 = np.packbits(hash_obj.hash, axis=1).flatten().view(np.uint64)
-                blacklist_hashes_array.append(hash_u64)
-            blacklist_hashes = np.array(blacklist_hashes_array)
-            del blacklist_hashes_array
-
         # 构建全局哈希数组和索引映射
         all_hashes = []
         hash_to_comic_idx = []
+        hash_to_image_idx = []
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
 
         current_idx = 0
@@ -408,11 +517,12 @@ class Scanner(QObject):
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
             hash_array = comic.image_hash_array
+            hash_index = np.arange(len(hash_array))
 
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
                 hamming_distances = np.bitwise_count(
-                    np.bitwise_xor(hash_array, blacklist_hashes.flatten())
+                    np.bitwise_xor(hash_array, blacklist_hashes)
                 )
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=1
@@ -420,11 +530,13 @@ class Scanner(QObject):
                 blacklist_image_count += np.sum(blacklist_mask)
                 # 过滤掉黑名单图片
                 hash_array = hash_array[~blacklist_mask]
+                hash_index = hash_index[~blacklist_mask]
 
             # 批量添加有效哈希
             if len(hash_array) > 0:
                 all_hashes.extend(hash_array)
                 hash_to_comic_idx.extend([comic_idx] * len(hash_array))
+                hash_to_image_idx.extend(hash_index)
                 current_idx += len(hash_array)
 
             end_idx = current_idx
@@ -442,6 +554,7 @@ class Scanner(QObject):
         # 转换为numpy矩阵
         all_hashes = np.array(all_hashes).flatten()  # shape: (total_images)
         hash_to_comic_idx = np.array(hash_to_comic_idx, dtype=np.int32)
+        hash_to_image_idx = np.array(hash_to_image_idx, dtype=np.int32)
 
         # 计算跳过的漫画数量并更新总文件数
         skipped_count = sum(
@@ -461,6 +574,11 @@ class Scanner(QObject):
 
         # 构建漫画到重复组的字典映射
         comic_to_group_map: Dict[ComicInfo, DuplicateGroup] = {}
+
+        # 更新字典映射
+        for group in valid_cached_groups:
+            for comic in group.comics:
+                comic_to_group_map[comic.cache_key] = group
 
         # 对每个漫画进行重复检测
         recall_comic_cache_keys = set()
@@ -495,8 +613,8 @@ class Scanner(QObject):
             comic_hashes = all_hashes[start_idx:end_idx]  # 当前漫画的哈希矩阵
 
             # 逐张计算汉明距离以优化内存占用
-            similar_comic_counts = {}
-            similarity_results = {}  # 存储每张图片的相似性结果 {image_idx: [(all_hash_idx, distance)]}
+            similar_comic_index_dict = {}  # {similar_idx: ({all_hash_idx1}, {all_hash_idx2})}
+            similarity_results = {}  # 存储每张图片的相似性结果 {all_hash_idx1: [(all_hash_idx2, distance)]}
 
             for img_idx, comic_hash in enumerate(comic_hashes):
                 # 计算当前图片与所有图片的汉明距离
@@ -509,27 +627,44 @@ class Scanner(QObject):
                 similar_indices = np.where(similarity_mask)[0]
 
                 # 存储相似性结果
-                similarity_results[img_idx] = [
+                similarity_results[start_idx + img_idx] = [
                     (idx, hamming_distances[idx]) for idx in similar_indices
                 ]
 
                 # 获取相似图片对应的漫画索引并统计
-                similar_comic_indices = hash_to_comic_idx[similar_indices]
-                for similar_comic_idx in similar_comic_indices:
+                for similar_idx in similar_indices:
+                    similar_comic_idx = hash_to_comic_idx[similar_idx]
                     if similar_comic_idx != comic_idx:  # 排除当前漫画
-                        similar_comic_counts[similar_comic_idx] = (
-                            similar_comic_counts.get(int(similar_comic_idx), 0) + 1
-                        )
+                        if similar_comic_idx in similar_comic_index_dict:
+                            similar_comic_index_dict[similar_comic_idx][0].add(img_idx)
+                            similar_comic_index_dict[similar_comic_idx][1].add(
+                                similar_idx
+                            )
+                        else:
+                            similar_comic_index_dict[similar_comic_idx] = (
+                                {img_idx},
+                                {similar_idx},
+                            )
 
             # 转换为numpy数组格式以保持兼容性
-            counts = np.array(list(similar_comic_counts.values()))
+            counts = np.array(
+                [
+                    min(len(indices1), len(indices2))
+                    for indices1, indices2 in similar_comic_index_dict.values()
+                ]
+            )
 
             # 更新缓存
             similar_comic_cache_dict[comic.cache_key] = counts
 
             # 找到满足最小相似图片数量要求的漫画
             valid_similar_comics = [
-                k for k, v in similar_comic_counts.items() if v >= min_similar_images
+                similar_comic_idx
+                for similar_comic_idx, (
+                    indices1,
+                    indices2,
+                ) in similar_comic_index_dict.items()
+                if min(len(indices1), len(indices2)) >= min_similar_images
             ]
 
             if len(valid_similar_comics) > 0:
@@ -538,44 +673,32 @@ class Scanner(QObject):
                 all_similar_groups = set()
 
                 for similar_comic_idx in valid_similar_comics:
+                    similar_comic = valid_comics[similar_comic_idx]
+                    similar_comics.append(similar_comic)
+
                     # 收集相似图片的位置信息
                     similar_start_idx, similar_end_idx = comic_hash_ranges[
                         similar_comic_idx
                     ]
 
-                    # 从similarity_results中收集相似图片对
-                    similar_pairs = []
-                    for img_idx, similar_list in similarity_results.items():
-                        for all_hash_idx, distance in similar_list:
+                    # 从结果中收集重复组
+                    current_comic_similar_indices = set()
+                    for all_hash_idx1, similar_list in similarity_results.items():
+                        for all_hash_idx2, distance in similar_list:
                             # 检查是否属于目标漫画
-                            if similar_start_idx <= all_hash_idx < similar_end_idx:
-                                similar_pairs.append(
-                                    (
-                                        img_idx,
-                                        all_hash_idx - similar_start_idx,
-                                        distance,
-                                    )
-                                )
+                            if similar_start_idx <= all_hash_idx2 < similar_end_idx:
+                                # 取漫画中图片的位置
+                                image_idx1 = hash_to_image_idx[all_hash_idx1]
+                                image_idx2 = hash_to_image_idx[all_hash_idx2]
 
-                    # 确保当前漫画也满足最小相似图片数量要求
-                    current_comic_similar_count = len(
-                        set(pair[0] for pair in similar_pairs)
-                    )
-                    if current_comic_similar_count >= min_similar_images:
-                        similar_comic = valid_comics[similar_comic_idx]
-                        similar_comics.append(similar_comic)
+                                current_comic_similar_indices.add(image_idx1)
+                                hash1 = comic.image_hashes[image_idx1][1]
+                                hash2 = similar_comic.image_hashes[image_idx2][1]
 
-                        for pos_i, pos_j, similarity in similar_pairs:
-                            hash1 = comic.image_hashes[pos_i][1]
-                            hash2 = similar_comic.image_hashes[pos_j][1]
-
-                            # 确保哈希顺序一致
-                            if hash1 > hash2:
-                                hash1, hash2 = hash2, hash1
-                            all_similar_groups.add((hash1, hash2, int(similarity)))
-
-                if len(similar_comics) <= 1:
-                    continue
+                                # 确保哈希顺序一致
+                                if hash1 > hash2:
+                                    hash1, hash2 = hash2, hash1
+                                all_similar_groups.add((hash1, hash2, int(distance)))
 
                 duplicate_group = DuplicateGroup(
                     comics=similar_comics,
@@ -615,9 +738,9 @@ class Scanner(QObject):
                 # 加入重复组
                 duplicate_groups.append(duplicate_group)
 
-                # 缓存持久化
-                self._persist_cache_keys(similar_comic_cache_dict)
+                # 索引持久化
+                self._persist_index(similar_comic_cache_dict, duplicate_groups)
 
         # 缓存持久化
-        self._persist_cache_keys(similar_comic_cache_dict)
+        self._persist_index(similar_comic_cache_dict, duplicate_groups)
         return duplicate_groups
