@@ -242,6 +242,8 @@ class Scanner(QObject):
         self,
         similar_comic_cache_dict: dict,
         duplicate_groups: List[DuplicateGroup],
+        similarity_threshold: int,
+        min_similar_images: int,
     ):
         """持久化索引"""
         cached_duplicate_groups = []
@@ -254,8 +256,10 @@ class Scanner(QObject):
 
         try:
             cache_data = {
-                "similar_comic_cache": similar_comic_cache_dict,
+                "similar_comic_cache_dict": similar_comic_cache_dict,
                 "cached_duplicate_groups": cached_duplicate_groups,
+                "similarity_threshold": similarity_threshold,
+                "min_similar_images": min_similar_images,
             }
             with open("index.db", "wb") as f:
                 pickle.dump(
@@ -411,8 +415,31 @@ class Scanner(QObject):
         try:
             with open("index.db", "rb") as f:
                 cache_data = pickle.load(f)
-                similar_comic_cache_dict = cache_data.get("similar_comic_cache", {})
+                similar_comic_cache_dict = cache_data.get(
+                    "similar_comic_cache_dict", {}
+                )
                 cached_duplicate_groups = cache_data.get("cached_duplicate_groups", [])
+                cached_similarity_threshold = cache_data.get(
+                    "similarity_threshold", None
+                )
+                cached_min_similar_images = cache_data.get("min_similar_images", None)
+
+                # 最小相似图片减少时
+                if (
+                    cached_min_similar_images is None
+                    or min_similar_images < cached_min_similar_images
+                ):
+                    cached_duplicate_groups = []
+                    logger.info("最小相似图片数量减少，清空缓存的重复组")
+
+                # 相似度阈值放宽时
+                if (
+                    cached_similarity_threshold is None
+                    or similarity_threshold > cached_similarity_threshold
+                ):
+                    cached_duplicate_groups = []
+                    similar_comic_cache_dict = {}
+                    logger.info("相似度阈值放宽，清空所有索引")
         except Exception:
             logger.debug("加载索引 index.db 失败")
 
@@ -764,8 +791,18 @@ class Scanner(QObject):
                 duplicate_groups.append(duplicate_group)
 
                 # 索引持久化
-                self._persist_index(similar_comic_cache_dict, duplicate_groups)
+                self._persist_index(
+                    similar_comic_cache_dict,
+                    duplicate_groups,
+                    similarity_threshold,
+                    min_similar_images,
+                )
 
         # 缓存持久化
-        self._persist_index(similar_comic_cache_dict, duplicate_groups)
+        self._persist_index(
+            similar_comic_cache_dict,
+            duplicate_groups,
+            similarity_threshold,
+            min_similar_images,
+        )
         return duplicate_groups
