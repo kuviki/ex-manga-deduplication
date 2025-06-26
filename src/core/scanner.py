@@ -434,11 +434,36 @@ class Scanner(QObject):
             if len(valid_comics_in_group) < 2:
                 continue  # 组中有效漫画少于2个，跳过
 
+            # 图片哈希到漫画的映射
+            hash_comic_cache_keys = {}
+            for comic in valid_comics_in_group:
+                for _, image_hash in comic.image_hashes:
+                    if image_hash in hash_comic_cache_keys:
+                        hash_comic_cache_keys[image_hash].add(comic.cache_key)
+                    else:
+                        hash_comic_cache_keys[image_hash] = {comic.cache_key}
+
             # 根据相似度阈值过滤哈希对
             valid_similar_hashes = set()
             valid_similar_hash_groups = []
             for hash1, hash2, distance in group.similar_hash_groups:
                 if distance <= similarity_threshold:
+                    # 检查哈希的漫画是否仍然存在
+                    if (
+                        hash1 not in hash_comic_cache_keys
+                        or hash2 not in hash_comic_cache_keys
+                    ):
+                        continue
+
+                    # 检查是否存在于不同漫画中
+                    # 如果两个哈希值的所有漫画都相同，则跳过
+                    if all(
+                        ck1 == ck2
+                        for ck1 in hash_comic_cache_keys[hash1]
+                        for ck2 in hash_comic_cache_keys[hash2]
+                    ):
+                        continue
+
                     if len(blacklist_hashes) == 0:
                         valid_similar_hash_groups.append((hash1, hash2, distance))
                         continue
