@@ -280,10 +280,14 @@ class Scanner(QObject):
 
             # 检查缓存
             if self.config.is_cache_enabled():
-                cached_info = self.cache_manager.get_comic_cache(
+                cached_info = self.cache_manager.get_cache(
                     file_path, mtime, self.config.get_hash_algorithm()
                 )
-                if cached_info:
+                if (
+                    cached_info
+                    and "image_hashes" in cached_info
+                    and "image_hash_array" in cached_info
+                ):
                     logger.debug(f"使用缓存数据: {file_path}")
                     return ComicInfo(
                         path=file_path,

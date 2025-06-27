@@ -43,11 +43,11 @@ class BlacklistManager:
                     file_mtime = os.path.getmtime(file_path)
 
                     # 检查缓存
-                    cache_data = self.cache_manager.get_comic_cache(
+                    cache_data = self.cache_manager.get_cache(
                         file_path, file_mtime, self.hasher.algorithm
                     )
-                    if cache_data:
-                        image_hash = cache_data["image_hashes"][0]
+                    if cache_data and "image_hash" in cache_data:
+                        image_hash = cache_data["image_hash"]
                         self.blacklist_hashes.add(image_hash)
                         continue
 
@@ -72,7 +72,7 @@ class BlacklistManager:
                                         file_path,
                                         file_mtime,
                                         self.hasher.algorithm,
-                                        {"image_hashes": [image_hash]},
+                                        {"image_hash": image_hash},
                                     )
 
                             except Exception as e:

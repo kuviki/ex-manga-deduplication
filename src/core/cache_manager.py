@@ -48,13 +48,13 @@ class CacheManager:
         """获取缓存文件路径"""
         return os.path.join(self.cache_dir, f"{cache_key}.cache")
 
-    def get_comic_cache(
+    def get_cache(
         self, file_path: str, mtime: float, algorithm: HashAlgorithm
     ) -> Optional[dict]:
-        """获取漫画文件的缓存数据
+        """获取文件的缓存数据
 
         Args:
-            file_path: 漫画文件路径
+            file_path: 文件路径
             mtime: 文件修改时间
             algorithm: 哈希算法
 
@@ -176,9 +176,6 @@ class CacheManager:
             # 检查数据结构
             data = cache_data["data"]
             if not isinstance(data, dict):
-                return False
-
-            if "image_hashes" not in data:
                 return False
 
             return True
