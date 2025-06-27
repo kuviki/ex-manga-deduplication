@@ -8,6 +8,6 @@ config.yaml
 /index.db
 /build/
 /dist/
-/main.exe
+*.exe
 /test/
 /.venv/

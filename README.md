@@ -55,7 +55,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/kuviki/ex-manga-deduplication
 cd ex-manga-deduplication
 ```
 
@@ -176,7 +176,6 @@ A: 如果有黑名单图片重复会输出到日志里
 
 如有问题或建议，请通过以下方式联系：
 - GitHub Issues
-- Email: [kuviki777@gmail.com]
 
 ---
 
