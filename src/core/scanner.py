@@ -17,7 +17,7 @@ from loguru import logger
 from PyQt5.QtCore import QObject, pyqtSignal
 from numpy.typing import NDArray
 
-from src.utils.file_utils import is_supported_archive
+from src.utils.file_utils import is_supported_archive, is_comic_folder
 
 from .config_manager import ConfigManager
 from .archive_reader import ArchiveReader
@@ -190,15 +190,25 @@ class Scanner(QObject):
                 logger.info("正在停止处理...")
 
     def _find_comic_files(self, directory: str) -> List[str]:
-        """查找目录中的所有漫画文件"""
+        """查找目录中的所有漫画文件和漫画文件夹"""
         comic_files = []
+        processed_dirs = set()  # 避免重复处理子目录
 
-        for root, _dirs, files in os.walk(directory):
+        for root, dirs, files in os.walk(directory):
+            # 检查当前目录是否是漫画文件夹
+            if root not in processed_dirs and is_comic_folder(root):
+                comic_files.append(root)
+                processed_dirs.add(root)
+                # 如果当前目录是漫画文件夹，跳过其子目录
+                dirs.clear()
+                continue
+            
+            # 检查压缩包文件
             for file in files:
                 if is_supported_archive(file):
                     comic_files.append(os.path.join(root, file))
 
-        logger.info(f"找到 {len(comic_files)} 个漫画文件")
+        logger.info(f"找到 {len(comic_files)} 个漫画文件/文件夹")
         return comic_files
 
     def _process_comic_files(self, comic_files: List[str]) -> List[ComicInfo]:
@@ -232,7 +242,7 @@ class Scanner(QObject):
 
                 except Exception:
                     logger.error(
-                        f"处理漫画文件失败 {file_path}: {traceback.format_exc()}"
+                        f"处理漫画失败 {file_path}: {traceback.format_exc()}"
                     )
                     self.progress.errors += 1
 
@@ -271,12 +281,23 @@ class Scanner(QObject):
             logger.error(f"更新缓存 index.db 失败: {e}")
 
     def _process_single_comic(self, file_path: str) -> Optional[ComicInfo]:
-        """处理单个漫画文件"""
+        """处理单个漫画文件或文件夹"""
         try:
-            # 获取文件信息
+            # 获取文件/文件夹信息
             file_stat = os.stat(file_path)
             mtime = file_stat.st_mtime
-            size = file_stat.st_size
+            
+            # 计算大小（文件夹需要递归计算）
+            if os.path.isdir(file_path):
+                size = 0
+                for root, dirs, files in os.walk(file_path):
+                    for file in files:
+                        try:
+                            size += os.path.getsize(os.path.join(root, file))
+                        except (OSError, IOError):
+                            pass
+            else:
+                size = file_stat.st_size
 
             # 检查缓存
             if self.config.is_cache_enabled():
@@ -300,7 +321,7 @@ class Scanner(QObject):
                         ),
                     )
 
-            # 处理压缩包
+            # 处理压缩包或文件夹
             image_hashes = []
             min_width, min_height = self.config.get_min_image_resolution()
 
@@ -363,7 +384,7 @@ class Scanner(QObject):
             return comic_info
 
         except Exception as e:
-            logger.error(f"处理漫画文件失败 {file_path}: {e}")
+            logger.error(f"处理漫画失败 {file_path}: {e}")
             return None
 
     def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:

@@ -24,10 +24,10 @@ class ArchiveReader:
         # rarfile.UNRAR_TOOL = "path/to/unrar.exe"  # Windows
 
     def get_image_files(self, archive_path: str) -> List[str]:
-        """获取压缩包中的所有图片文件列表
+        """获取压缩包或文件夹中的所有图片文件列表
 
         Args:
-            archive_path: 压缩包路径
+            archive_path: 压缩包路径或文件夹路径
 
         Returns:
             List[str]: 图片文件名列表（按自然排序）
@@ -35,7 +35,15 @@ class ArchiveReader:
         try:
             image_files = []
 
-            if archive_path.lower().endswith((".zip", ".cbz")):
+            # 处理文件夹
+            if os.path.isdir(archive_path):
+                for filename in os.listdir(archive_path):
+                    file_path = os.path.join(archive_path, filename)
+                    if os.path.isfile(file_path) and is_supported_image(filename):
+                        image_files.append(filename)
+            
+            # 处理压缩包
+            elif archive_path.lower().endswith((".zip", ".cbz")):
                 with zipfile.ZipFile(archive_path, "r") as archive:
                     for filename in archive.namelist():
                         if is_supported_image(filename) and not filename.endswith("/"):
@@ -52,21 +60,30 @@ class ArchiveReader:
             return image_files
 
         except Exception as e:
-            logger.error(f"获取压缩包图片列表失败 {archive_path}: {e}")
+            logger.error(f"获取图片列表失败 {archive_path}: {e}")
             return []
 
     def read_image(self, archive_path: str, image_filename: str) -> Optional[bytes]:
-        """从压缩包中读取指定图片
+        """从压缩包或文件夹中读取指定图片
 
         Args:
-            archive_path: 压缩包路径
+            archive_path: 压缩包路径或文件夹路径
             image_filename: 图片文件名
 
         Returns:
             Optional[bytes]: 图片数据，失败时返回None
         """
         try:
-            if archive_path.lower().endswith((".zip", ".cbz")):
+            # 处理文件夹
+            if os.path.isdir(archive_path):
+                image_path = os.path.join(archive_path, image_filename)
+                if os.path.isfile(image_path):
+                    with open(image_path, "rb") as f:
+                        return f.read()
+                return None
+            
+            # 处理压缩包
+            elif archive_path.lower().endswith((".zip", ".cbz")):
                 with zipfile.ZipFile(archive_path, "r") as archive:
                     return archive.read(image_filename)
 
@@ -77,16 +94,16 @@ class ArchiveReader:
             return None
 
         except Exception as e:
-            logger.error(f"读取压缩包图片失败 {archive_path}/{image_filename}: {e}")
+            logger.error(f"读取图片失败 {archive_path}/{image_filename}: {e}")
             return None
 
     def read_all_images(
         self, archive_path: str
     ) -> Generator[Tuple[str, bytes], None, None]:
-        """读取压缩包中的所有图片
+        """读取压缩包或文件夹中的所有图片
 
         Args:
-            archive_path: 压缩包路径
+            archive_path: 压缩包路径或文件夹路径
 
         Yields:
             Tuple[str, bytes]: (文件名, 图片数据)
@@ -99,37 +116,61 @@ class ArchiveReader:
                 yield filename, image_data
 
     def get_archive_info(self, archive_path: str) -> Dict[str, any]:
-        """获取压缩包信息
+        """获取压缩包或文件夹信息
 
         Args:
-            archive_path: 压缩包路径
+            archive_path: 压缩包路径或文件夹路径
 
         Returns:
-            Dict: 压缩包信息
+            Dict: 压缩包或文件夹信息
         """
         try:
-            info = {
-                "path": archive_path,
-                "size": os.path.getsize(archive_path),
-                "mtime": os.path.getmtime(archive_path),
-                "total_files": 0,
-                "image_files": 0,
-                "image_list": [],
-            }
+            # 处理文件夹
+            if os.path.isdir(archive_path):
+                # 计算文件夹大小
+                total_size = 0
+                total_files = 0
+                for root, dirs, files in os.walk(archive_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        try:
+                            total_size += os.path.getsize(file_path)
+                            total_files += 1
+                        except (OSError, IOError):
+                            pass
+                
+                info = {
+                    "path": archive_path,
+                    "size": total_size,
+                    "mtime": os.path.getmtime(archive_path),
+                    "total_files": total_files,
+                    "image_files": 0,
+                    "image_list": [],
+                }
+            else:
+                # 处理压缩包
+                info = {
+                    "path": archive_path,
+                    "size": os.path.getsize(archive_path),
+                    "mtime": os.path.getmtime(archive_path),
+                    "total_files": 0,
+                    "image_files": 0,
+                    "image_list": [],
+                }
 
-            if archive_path.lower().endswith((".zip", ".cbz")):
-                with zipfile.ZipFile(archive_path, "r") as archive:
-                    all_files = archive.namelist()
-                    info["total_files"] = len(
-                        [f for f in all_files if not f.endswith("/")]
-                    )
+                if archive_path.lower().endswith((".zip", ".cbz")):
+                    with zipfile.ZipFile(archive_path, "r") as archive:
+                        all_files = archive.namelist()
+                        info["total_files"] = len(
+                            [f for f in all_files if not f.endswith("/")]
+                        )
 
-            elif archive_path.lower().endswith((".rar", ".cbr")):
-                with rarfile.RarFile(archive_path, "r") as archive:
-                    all_files = archive.namelist()
-                    info["total_files"] = len(
-                        [f for f in all_files if not f.endswith("/")]
-                    )
+                elif archive_path.lower().endswith((".rar", ".cbr")):
+                    with rarfile.RarFile(archive_path, "r") as archive:
+                        all_files = archive.namelist()
+                        info["total_files"] = len(
+                            [f for f in all_files if not f.endswith("/")]
+                        )
 
             # 获取图片文件信息
             image_files = self.get_image_files(archive_path)
@@ -139,7 +180,7 @@ class ArchiveReader:
             return info
 
         except Exception as e:
-            logger.error(f"获取压缩包信息失败 {archive_path}: {e}")
+            logger.error(f"获取信息失败 {archive_path}: {e}")
             return {
                 "path": archive_path,
                 "size": 0,
