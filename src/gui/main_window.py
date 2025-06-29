@@ -6,10 +6,12 @@
 
 import os
 import time
-from typing import List
-from datetime import timedelta
+from typing import List, Optional
+from datetime import timedelta, datetime
 from PyQt5.QtWidgets import (
     QMainWindow,
+    QSizePolicy,
+    QSpacerItem,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -25,6 +27,9 @@ from PyQt5.QtWidgets import (
     QStatusBar,
     QToolButton,
     QFrame,
+    QDateTimeEdit,
+    QCheckBox,
+    QGridLayout,
 )
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QFont, QIcon
@@ -43,14 +48,32 @@ from .about_dialog import AboutDialog
 class ScanThread(QThread):
     """扫描线程"""
 
-    def __init__(self, scanner: Scanner, directory: str):
+    def __init__(
+        self,
+        scanner: Scanner,
+        directory: str,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+    ):
         super().__init__()
         self.scanner = scanner
         self.directory = directory
+        self.created_after = created_after
+        self.created_before = created_before
+        self.modified_after = modified_after
+        self.modified_before = modified_before
 
     def run(self):
         """运行扫描"""
-        self.scanner.scan_directory(self.directory)
+        self.scanner.scan_directory(
+            self.directory,
+            created_after=self.created_after,
+            created_before=self.created_before,
+            modified_after=self.modified_after,
+            modified_before=self.modified_before,
+        )
 
 
 class MainWindow(QMainWindow):
@@ -168,6 +191,53 @@ class MainWindow(QMainWindow):
         dir_layout.addWidget(self.dir_label, 1)
         dir_layout.addWidget(self.select_dir_btn)
 
+        # 筛选设置区域
+        self.filter_group = QGroupBox("筛选设置")
+        filter_layout = QGridLayout(self.filter_group)
+
+        # 创建时间筛选
+        self.created_time_enabled = QCheckBox("按创建时间筛选")
+        filter_layout.addWidget(self.created_time_enabled, 0, 0, 1, 2)
+
+        filter_layout.addWidget(QLabel("从"), 1, 0)
+        self.created_after_edit = QDateTimeEdit()
+        self.created_after_edit.setDateTime(datetime.now().replace(month=1, day=1))
+        self.created_after_edit.setEnabled(False)
+        filter_layout.addWidget(self.created_after_edit, 1, 1)
+
+        filter_layout.addWidget(QLabel("到"), 1, 2)
+        self.created_before_edit = QDateTimeEdit()
+        self.created_before_edit.setDateTime(datetime.now())
+        self.created_before_edit.setEnabled(False)
+        filter_layout.addWidget(self.created_before_edit, 1, 3)
+
+        # 添加空白间隔
+        filter_layout.addItem(
+            QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum), 1, 4
+        )
+
+        # 修改时间筛选
+        self.modified_time_enabled = QCheckBox("按修改时间筛选")
+        filter_layout.addWidget(self.modified_time_enabled, 0, 5, 1, 2)
+
+        filter_layout.addWidget(QLabel("从"), 1, 5)
+        self.modified_after_edit = QDateTimeEdit()
+        self.modified_after_edit.setDateTime(datetime.now().replace(month=1, day=1))
+        self.modified_after_edit.setEnabled(False)
+        filter_layout.addWidget(self.modified_after_edit, 1, 6)
+
+        filter_layout.addWidget(QLabel("到"), 1, 7)
+        self.modified_before_edit = QDateTimeEdit()
+        self.modified_before_edit.setDateTime(datetime.now())
+        self.modified_before_edit.setEnabled(False)
+        filter_layout.addWidget(self.modified_before_edit, 1, 8)
+
+        # 连接信号
+        self.created_time_enabled.toggled.connect(self._on_created_time_filter_toggled)
+        self.modified_time_enabled.toggled.connect(
+            self._on_modified_time_filter_toggled
+        )
+
         # 控制按钮区域
         self.control_group = QGroupBox("扫描控制")
         control_layout = QHBoxLayout(self.control_group)
@@ -208,7 +278,12 @@ class MainWindow(QMainWindow):
         top_row_layout.addWidget(self.dir_group, 3)
         top_row_layout.addWidget(self.control_group, 1)
 
+        mid_row_layout = QHBoxLayout()
+        mid_row_layout.addWidget(self.filter_group)
+        mid_row_layout.addStretch()
+
         collapsible_layout.addLayout(top_row_layout)
+        collapsible_layout.addLayout(mid_row_layout)
         collapsible_layout.addWidget(self.progress_group)
 
         # 工具栏主布局
@@ -231,10 +306,21 @@ class MainWindow(QMainWindow):
 
         return toolbar_widget
 
+    def _on_created_time_filter_toggled(self, enabled: bool):
+        """处理创建时间筛选开关"""
+        self.created_after_edit.setEnabled(enabled)
+        self.created_before_edit.setEnabled(enabled)
+
+    def _on_modified_time_filter_toggled(self, enabled: bool):
+        """处理修改时间筛选开关"""
+        self.modified_after_edit.setEnabled(enabled)
+        self.modified_before_edit.setEnabled(enabled)
+
     def toggle_groups_visibility(self):
         """切换分组的可见性"""
         is_visible = not self.dir_group.isVisible()
         self.dir_group.setVisible(is_visible)
+        self.filter_group.setVisible(is_visible)
         self.control_group.setVisible(is_visible)
         self.progress_group.setVisible(is_visible)
 
@@ -360,8 +446,29 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(True)
         self.select_dir_btn.setEnabled(False)
 
+        # 获取筛选参数
+        created_after = None
+        created_before = None
+        modified_after = None
+        modified_before = None
+
+        if self.created_time_enabled.isChecked():
+            created_after = self.created_after_edit.dateTime().toPyDateTime()
+            created_before = self.created_before_edit.dateTime().toPyDateTime()
+
+        if self.modified_time_enabled.isChecked():
+            modified_after = self.modified_after_edit.dateTime().toPyDateTime()
+            modified_before = self.modified_before_edit.dateTime().toPyDateTime()
+
         # 启动扫描线程
-        self.scan_thread = ScanThread(self.scanner, directory)
+        self.scan_thread = ScanThread(
+            self.scanner,
+            directory,
+            created_after=created_after,
+            created_before=created_before,
+            modified_after=modified_after,
+            modified_before=modified_before,
+        )
         self.scan_thread.start()
 
         logger.info(f"开始扫描: {directory}")

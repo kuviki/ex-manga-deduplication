@@ -11,6 +11,7 @@ import traceback
 import numpy as np
 import imagehash
 from typing import Dict, List, Set, Tuple, Optional
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from loguru import logger
@@ -109,11 +110,19 @@ class Scanner(QObject):
 
         self.progress = ScanProgress()
 
-    def scan_directory(self, directory: str) -> None:
+    def scan_directory(self, directory: str, 
+                      created_after: Optional[datetime] = None,
+                      created_before: Optional[datetime] = None,
+                      modified_after: Optional[datetime] = None,
+                      modified_before: Optional[datetime] = None) -> None:
         """扫描目录中的漫画文件
 
         Args:
             directory: 要扫描的目录路径
+            created_after: 创建时间筛选起始时间
+            created_before: 创建时间筛选结束时间
+            modified_after: 修改时间筛选起始时间
+            modified_before: 修改时间筛选结束时间
         """
         if self.is_scanning:
             logger.warning("扫描已在进行中")
@@ -138,7 +147,13 @@ class Scanner(QObject):
             self.progress.start_time = start_time
 
             # 扫描漫画文件
-            comic_infos = self._process_comic_files(comic_files)
+            comic_infos = self._process_comic_files(
+                comic_files, 
+                created_after=created_after,
+                created_before=created_before,
+                modified_after=modified_after,
+                modified_before=modified_before
+            )
 
             if self.should_stop:
                 logger.info("扫描已停止")
@@ -211,7 +226,11 @@ class Scanner(QObject):
         logger.info(f"找到 {len(comic_files)} 个漫画文件/文件夹")
         return comic_files
 
-    def _process_comic_files(self, comic_files: List[str]) -> List[ComicInfo]:
+    def _process_comic_files(self, comic_files: List[str],
+                           created_after: Optional[datetime] = None,
+                           created_before: Optional[datetime] = None,
+                           modified_after: Optional[datetime] = None,
+                           modified_before: Optional[datetime] = None) -> List[ComicInfo]:
         """处理漫画文件，提取图片哈希"""
         comic_infos = []
         max_workers = self.config.get_max_workers()
@@ -219,7 +238,14 @@ class Scanner(QObject):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # 提交任务
             future_to_file = {
-                executor.submit(self._process_single_comic, file): file
+                executor.submit(
+                    self._process_single_comic, 
+                    file, 
+                    created_after, 
+                    created_before, 
+                    modified_after, 
+                    modified_before
+                ): file
                 for file in comic_files
             }
 
@@ -280,12 +306,32 @@ class Scanner(QObject):
         except Exception as e:
             logger.error(f"更新缓存 index.db 失败: {e}")
 
-    def _process_single_comic(self, file_path: str) -> Optional[ComicInfo]:
+    def _process_single_comic(self, file_path: str,
+                            created_after: Optional[datetime] = None,
+                            created_before: Optional[datetime] = None,
+                            modified_after: Optional[datetime] = None,
+                            modified_before: Optional[datetime] = None) -> Optional[ComicInfo]:
         """处理单个漫画文件或文件夹"""
         try:
             # 获取文件/文件夹信息
             file_stat = os.stat(file_path)
             mtime = file_stat.st_mtime
+            ctime = file_stat.st_ctime  # 创建时间
+            
+            # 时间过滤检查
+            if created_after or created_before:
+                created_time = datetime.fromtimestamp(ctime)
+                if created_after and created_time < created_after:
+                    return None
+                if created_before and created_time > created_before:
+                    return None
+            
+            if modified_after or modified_before:
+                modified_time = datetime.fromtimestamp(mtime)
+                if modified_after and modified_time < modified_after:
+                    return None
+                if modified_before and modified_time > modified_before:
+                    return None
             
             # 计算大小（文件夹需要递归计算）
             if os.path.isdir(file_path):
