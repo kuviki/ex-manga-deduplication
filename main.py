@@ -4,17 +4,19 @@
 漫画去重工具主入口
 """
 
-import sys
 import os
-from PyQt5.QtWidgets import QApplication
+import sys
+
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 from loguru import logger
+
+from src import __version__
+from src.core.config_manager import ConfigManager
+from src.gui.main_window import MainWindow
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from src.gui.main_window import MainWindow
-from src.core.config_manager import ConfigManager
 
 
 def setup_logging():
@@ -55,7 +57,7 @@ def main():
     # 创建应用程序
     app = QApplication(sys.argv)
     app.setApplicationName("Ex-漫画去重工具")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion(__version__)
 
     try:
         # 初始化配置管理器

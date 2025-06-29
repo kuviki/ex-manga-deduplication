@@ -4,45 +4,47 @@
 应用程序的主要用户界面
 """
 
+from datetime import datetime, timedelta
 import os
 import time
 from typing import List, Optional
-from datetime import timedelta, datetime
+
+from PyQt5.QtCore import QThread, Qt
+from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
+    QAction,
+    QCheckBox,
+    QDateTimeEdit,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
     QSizePolicy,
     QSpacerItem,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
     QSplitter,
-    QGroupBox,
-    QLabel,
-    QPushButton,
-    QProgressBar,
-    QTextEdit,
-    QFileDialog,
-    QMessageBox,
-    QAction,
     QStatusBar,
+    QTextEdit,
     QToolButton,
-    QFrame,
-    QDateTimeEdit,
-    QCheckBox,
-    QGridLayout,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt, QThread
-from PyQt5.QtGui import QFont, QIcon
 import PyTaskbar
 from loguru import logger
 from send2trash import send2trash
 
+from .. import __version__
 from ..core.config_manager import ConfigManager
-from ..core.scanner import Scanner, ScanProgress, DuplicateGroup, ComicInfo
-from .settings_dialog import SettingsDialog
-from .image_preview_widget import ImagePreviewWidget
-from .duplicate_list_widget import DuplicateListWidget
+from ..core.scanner import ComicInfo, DuplicateGroup, ScanProgress, Scanner
 from .about_dialog import AboutDialog
+from .duplicate_list_widget import DuplicateListWidget
+from .image_preview_widget import ImagePreviewWidget
+from .settings_dialog import SettingsDialog
 
 
 class ScanThread(QThread):
@@ -95,7 +97,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         """初始化用户界面"""
-        self.setWindowTitle("Ex-漫画去重工具 v1.0.0")
+        self.setWindowTitle(f"Ex-漫画去重工具 v{__version__}")
         self.setWindowIcon(QIcon("resources/icon.png"))
 
         # 创建中央部件
