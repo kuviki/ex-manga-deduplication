@@ -88,6 +88,7 @@ class DuplicateListWidget(QWidget):
 
         # 连接信号
         self.tree_widget.itemClicked.connect(self.on_item_clicked)
+        self.tree_widget.itemSelectionChanged.connect(self.on_selection_changed)
         self.tree_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_widget.customContextMenuRequested.connect(self.show_context_menu)
 
@@ -213,6 +214,17 @@ class DuplicateListWidget(QWidget):
 
     def on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """处理项目点击事件"""
+        # 点击事件现在由 on_selection_changed 统一处理
+        pass
+
+    def on_selection_changed(self):
+        """处理选择变化事件（支持鼠标点击、右键、键盘方向键等）"""
+        selected_items = self.tree_widget.selectedItems()
+        if not selected_items:
+            return
+
+        # 获取第一个选中的项目
+        item = selected_items[0]
         data = item.data(0, Qt.UserRole)
         if not data:
             return
@@ -222,8 +234,6 @@ class DuplicateListWidget(QWidget):
             self.comic_selected.emit(
                 data["comic"], data["group"], data["duplicate_count"]
             )
-            # # 切换已检查状态
-            # self._update_comic_checked_state(item, data["comic"])
 
     def show_context_menu(self, position):
         """显示右键菜单"""
