@@ -6,7 +6,7 @@
 
 import os
 import subprocess
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QFont
@@ -430,7 +430,7 @@ class DuplicateListWidget(QWidget):
     def refresh_after_deletion(self, deleted_paths: List[str]):
         """删除文件后刷新列表"""
         # 从重复组中移除已删除的漫画
-        for group in self.duplicate_groups[:]:
+        for group in self.duplicate_groups:
             group.comics = [
                 comic for comic in group.comics if comic.path not in deleted_paths
             ]
@@ -438,6 +438,26 @@ class DuplicateListWidget(QWidget):
             # 如果组中只剩一个漫画，移除整个组
             if len(group.comics) <= 1:
                 self.duplicate_groups.remove(group)
+
+        # 从重复组中移除无效的图片哈希对
+        for group in self.duplicate_groups:
+            valid_hashes: Dict[str, Set[int]] = dict()
+
+            # 收集当前组中的所有哈希值
+            for idx, comic in enumerate(group.comics):
+                for hash in comic.image_hashes:
+                    if hash[1] in valid_hashes:
+                        valid_hashes[hash[1]].add(idx)
+                    else:
+                        valid_hashes[hash[1]] = {idx}
+
+            group.similar_hash_groups = {
+                (h1, h2, sim)
+                for h1, h2, sim in group.similar_hash_groups
+                if h1 in valid_hashes
+                and h2 in valid_hashes
+                and len(valid_hashes[h1].union(valid_hashes[h2])) > 1
+            }
 
         # 刷新显示
         self.refresh_list()
