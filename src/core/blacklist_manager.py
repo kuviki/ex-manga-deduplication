@@ -48,7 +48,12 @@ class BlacklistManager:
                     )
                     if cache_data and "image_hash" in cache_data:
                         image_hash = cache_data["image_hash"]
-                        self.blacklist_hashes.add(image_hash)
+
+                        # 检查是否重复
+                        if image_hash in self.blacklist_hashes:
+                            logger.warning(f"黑名单图片重复: {filename}")
+                        else:
+                            self.blacklist_hashes.add(image_hash)
                         continue
 
                     # 检查是否为文件且为支持的图片格式
