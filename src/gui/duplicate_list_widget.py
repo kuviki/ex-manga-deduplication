@@ -459,6 +459,24 @@ class DuplicateListWidget(QWidget):
                 and len(valid_hashes[h1].union(valid_hashes[h2])) > 1
             }
 
+        # 从重复组中移除无重复的漫画
+        for group in self.duplicate_groups:
+            similar_hashes = set()
+            for hash in group.similar_hash_groups:
+                similar_hashes.add(hash[0])
+                similar_hashes.add(hash[1])
+
+            # 移除不在相似哈希中的漫画
+            group.comics = [
+                comic
+                for comic in group.comics
+                if any(h[1] in similar_hashes for h in comic.image_hashes)
+            ]
+
+            # 如果组中只剩一个漫画，移除整个组
+            if len(group.comics) <= 1:
+                self.duplicate_groups.remove(group)
+
         # 刷新显示
         self.refresh_list()
 
