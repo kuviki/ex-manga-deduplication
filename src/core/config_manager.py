@@ -71,6 +71,17 @@ class ConfigManager:
             "last_scanned_directory": "",
             # 已检查漫画路径
             "checked_comic_paths": [],
+            # 筛选设置
+            "filter_settings": {
+                "created_time_enabled": False,
+                "created_after": None,
+                "created_before": None,
+                "modified_time_enabled": False,
+                "modified_after": None,
+                "modified_before": None,
+                "name_filter_enabled": False,
+                "name_filter_regex": "",
+            },
         }
 
     def load_config(self) -> None:
@@ -202,3 +213,20 @@ class ConfigManager:
         min_count = range_config.get("min", 1)
         max_count = range_config.get("max", None)
         return min_count, max_count
+
+    def get_filter_settings(self) -> Dict[str, Any]:
+        """获取筛选设置"""
+        return self.get("filter_settings", {
+            "created_time_enabled": False,
+            "created_after": None,
+            "created_before": None,
+            "modified_time_enabled": False,
+            "modified_after": None,
+            "modified_before": None,
+            "name_filter_enabled": False,
+            "name_filter_regex": "",
+        })
+
+    def set_filter_settings(self, settings: Dict[str, Any]):
+        """设置筛选设置"""
+        self.set("filter_settings", settings)

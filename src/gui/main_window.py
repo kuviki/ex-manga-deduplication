@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -58,6 +59,7 @@ class ScanThread(QThread):
         created_before: Optional[datetime] = None,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
+        name_filter_regex: Optional[str] = None,
     ):
         super().__init__()
         self.scanner = scanner
@@ -66,6 +68,7 @@ class ScanThread(QThread):
         self.created_before = created_before
         self.modified_after = modified_after
         self.modified_before = modified_before
+        self.name_filter_regex = name_filter_regex
 
     def run(self):
         """运行扫描"""
@@ -75,6 +78,7 @@ class ScanThread(QThread):
             created_before=self.created_before,
             modified_after=self.modified_after,
             modified_before=self.modified_before,
+            name_filter_regex=self.name_filter_regex,
         )
 
 
@@ -234,11 +238,21 @@ class MainWindow(QMainWindow):
         self.modified_before_edit.setEnabled(False)
         filter_layout.addWidget(self.modified_before_edit, 1, 8)
 
+        # 名称筛选
+        self.name_filter_enabled = QCheckBox("按名称筛选")
+        filter_layout.addWidget(self.name_filter_enabled, 2, 0, 1, 2)
+
+        self.name_filter_edit = QLineEdit()
+        self.name_filter_edit.setPlaceholderText("输入正则表达式，匹配的漫画名将被排除")
+        self.name_filter_edit.setEnabled(False)
+        filter_layout.addWidget(self.name_filter_edit, 3, 0, 1, 10)
+
         # 连接信号
         self.created_time_enabled.toggled.connect(self._on_created_time_filter_toggled)
         self.modified_time_enabled.toggled.connect(
             self._on_modified_time_filter_toggled
         )
+        self.name_filter_enabled.toggled.connect(self._on_name_filter_toggled)
 
         # 控制按钮区域
         self.control_group = QGroupBox("扫描控制")
@@ -317,6 +331,10 @@ class MainWindow(QMainWindow):
         """处理修改时间筛选开关"""
         self.modified_after_edit.setEnabled(enabled)
         self.modified_before_edit.setEnabled(enabled)
+
+    def _on_name_filter_toggled(self, enabled: bool):
+        """处理名称筛选开关"""
+        self.name_filter_edit.setEnabled(enabled)
 
     def toggle_groups_visibility(self):
         """切换分组的可见性"""
@@ -407,6 +425,56 @@ class MainWindow(QMainWindow):
             self.dir_label.setStyleSheet("color: black; font-style: normal;")
             self.scan_btn.setEnabled(True)
 
+        # 加载筛选设置
+        filter_settings = self.config.get_filter_settings()
+
+        # 创建时间筛选
+        self.created_time_enabled.setChecked(
+            filter_settings.get("created_time_enabled", False)
+        )
+        if filter_settings.get("created_after"):
+            self.created_after_edit.setDateTime(filter_settings["created_after"])
+        if filter_settings.get("created_before"):
+            self.created_before_edit.setDateTime(filter_settings["created_before"])
+
+        # 修改时间筛选
+        self.modified_time_enabled.setChecked(
+            filter_settings.get("modified_time_enabled", False)
+        )
+        if filter_settings.get("modified_after"):
+            self.modified_after_edit.setDateTime(filter_settings["modified_after"])
+        if filter_settings.get("modified_before"):
+            self.modified_before_edit.setDateTime(filter_settings["modified_before"])
+
+        # 名称筛选
+        self.name_filter_enabled.setChecked(
+            filter_settings.get("name_filter_enabled", False)
+        )
+        self.name_filter_edit.setText(filter_settings.get("name_filter_regex", ""))
+
+    def save_filter_settings(self):
+        """保存筛选设置"""
+        filter_settings = {
+            "created_time_enabled": self.created_time_enabled.isChecked(),
+            "created_after": self.created_after_edit.dateTime().toPyDateTime()
+            if self.created_time_enabled.isChecked()
+            else None,
+            "created_before": self.created_before_edit.dateTime().toPyDateTime()
+            if self.created_time_enabled.isChecked()
+            else None,
+            "modified_time_enabled": self.modified_time_enabled.isChecked(),
+            "modified_after": self.modified_after_edit.dateTime().toPyDateTime()
+            if self.modified_time_enabled.isChecked()
+            else None,
+            "modified_before": self.modified_before_edit.dateTime().toPyDateTime()
+            if self.modified_time_enabled.isChecked()
+            else None,
+            "name_filter_enabled": self.name_filter_enabled.isChecked(),
+            "name_filter_regex": self.name_filter_edit.text(),
+        }
+        self.config.set_filter_settings(filter_settings)
+        self.config.save_config()
+
     def select_directory(self):
         """选择扫描目录"""
         directory = QFileDialog.getExistingDirectory(
@@ -448,11 +516,15 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(True)
         self.select_dir_btn.setEnabled(False)
 
+        # 保存筛选设置
+        self.save_filter_settings()
+
         # 获取筛选参数
         created_after = None
         created_before = None
         modified_after = None
         modified_before = None
+        name_filter_regex = None
 
         if self.created_time_enabled.isChecked():
             created_after = self.created_after_edit.dateTime().toPyDateTime()
@@ -462,6 +534,11 @@ class MainWindow(QMainWindow):
             modified_after = self.modified_after_edit.dateTime().toPyDateTime()
             modified_before = self.modified_before_edit.dateTime().toPyDateTime()
 
+        if self.name_filter_enabled.isChecked():
+            name_filter_regex = self.name_filter_edit.text().strip()
+            if not name_filter_regex:
+                name_filter_regex = None
+
         # 启动扫描线程
         self.scan_thread = ScanThread(
             self.scanner,
@@ -470,6 +547,7 @@ class MainWindow(QMainWindow):
             created_before=created_before,
             modified_after=modified_after,
             modified_before=modified_before,
+            name_filter_regex=name_filter_regex,
         )
         self.scan_thread.start()
 
