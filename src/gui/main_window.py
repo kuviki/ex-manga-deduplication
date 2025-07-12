@@ -243,7 +243,9 @@ class MainWindow(QMainWindow):
         filter_layout.addWidget(self.name_filter_enabled, 2, 0, 1, 2)
 
         self.name_filter_edit = QLineEdit()
-        self.name_filter_edit.setPlaceholderText("输入正则表达式，匹配的漫画名将被排除")
+        self.name_filter_edit.setPlaceholderText(
+            "输入正则表达式，匹配的漫画名将被排除，不区分大小写"
+        )
         self.name_filter_edit.setEnabled(False)
         filter_layout.addWidget(self.name_filter_edit, 3, 0, 1, 10)
 
