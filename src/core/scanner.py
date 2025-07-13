@@ -111,12 +111,15 @@ class Scanner(QObject):
 
         self.progress = ScanProgress()
 
-    def scan_directory(self, directory: str, 
-                      created_after: Optional[datetime] = None,
-                      created_before: Optional[datetime] = None,
-                      modified_after: Optional[datetime] = None,
-                      modified_before: Optional[datetime] = None,
-                      name_filter_regex: Optional[str] = None) -> None:
+    def scan_directory(
+        self,
+        directory: str,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+        name_filter_regex: Optional[str] = None,
+    ) -> None:
         """扫描目录中的漫画文件
 
         Args:
@@ -151,12 +154,12 @@ class Scanner(QObject):
 
             # 扫描漫画文件
             comic_infos = self._process_comic_files(
-                comic_files, 
+                comic_files,
                 created_after=created_after,
                 created_before=created_before,
                 modified_after=modified_after,
                 modified_before=modified_before,
-                name_filter_regex=name_filter_regex
+                name_filter_regex=name_filter_regex,
             )
 
             if self.should_stop:
@@ -221,7 +224,7 @@ class Scanner(QObject):
                 # 如果当前目录是漫画文件夹，跳过其子目录
                 dirs.clear()
                 continue
-            
+
             # 检查压缩包文件
             for file in files:
                 if is_supported_archive(file):
@@ -230,12 +233,15 @@ class Scanner(QObject):
         logger.info(f"找到 {len(comic_files)} 个漫画文件/文件夹")
         return comic_files
 
-    def _process_comic_files(self, comic_files: List[str],
-                           created_after: Optional[datetime] = None,
-                           created_before: Optional[datetime] = None,
-                           modified_after: Optional[datetime] = None,
-                           modified_before: Optional[datetime] = None,
-                           name_filter_regex: Optional[str] = None) -> List[ComicInfo]:
+    def _process_comic_files(
+        self,
+        comic_files: List[str],
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+        name_filter_regex: Optional[str] = None,
+    ) -> List[ComicInfo]:
         """处理漫画文件，提取图片哈希"""
         comic_infos = []
         max_workers = self.config.get_max_workers()
@@ -244,13 +250,13 @@ class Scanner(QObject):
             # 提交任务
             future_to_file = {
                 executor.submit(
-                    self._process_single_comic, 
-                    file, 
-                    created_after, 
-                    created_before, 
-                    modified_after, 
+                    self._process_single_comic,
+                    file,
+                    created_after,
+                    created_before,
+                    modified_after,
                     modified_before,
-                    name_filter_regex
+                    name_filter_regex,
                 ): file
                 for file in comic_files
             }
@@ -273,9 +279,7 @@ class Scanner(QObject):
                     self.progress_updated.emit(self.progress)
 
                 except Exception:
-                    logger.error(
-                        f"处理漫画失败 {file_path}: {traceback.format_exc()}"
-                    )
+                    logger.error(f"处理漫画失败 {file_path}: {traceback.format_exc()}")
                     self.progress.errors += 1
 
         return comic_infos
@@ -312,12 +316,15 @@ class Scanner(QObject):
         except Exception as e:
             logger.error(f"更新缓存 index.db 失败: {e}")
 
-    def _process_single_comic(self, file_path: str,
-                            created_after: Optional[datetime] = None,
-                            created_before: Optional[datetime] = None,
-                            modified_after: Optional[datetime] = None,
-                            modified_before: Optional[datetime] = None,
-                            name_filter_regex: Optional[str] = None) -> Optional[ComicInfo]:
+    def _process_single_comic(
+        self,
+        file_path: str,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        modified_after: Optional[datetime] = None,
+        modified_before: Optional[datetime] = None,
+        name_filter_regex: Optional[str] = None,
+    ) -> Optional[ComicInfo]:
         """处理单个漫画文件或文件夹"""
         try:
             # 名称筛选检查
@@ -330,12 +337,12 @@ class Scanner(QObject):
                 except re.error as e:
                     logger.warning(f"正则表达式错误: {e}")
                     # 如果正则表达式有错误，继续处理文件
-            
+
             # 获取文件/文件夹信息
             file_stat = os.stat(file_path)
             mtime = file_stat.st_mtime
             ctime = file_stat.st_ctime  # 创建时间
-            
+
             # 时间过滤检查
             if created_after or created_before:
                 created_time = datetime.fromtimestamp(ctime)
@@ -343,14 +350,14 @@ class Scanner(QObject):
                     return None
                 if created_before and created_time > created_before:
                     return None
-            
+
             if modified_after or modified_before:
                 modified_time = datetime.fromtimestamp(mtime)
                 if modified_after and modified_time < modified_after:
                     return None
                 if modified_before and modified_time > modified_before:
                     return None
-            
+
             # 计算大小（文件夹需要递归计算）
             if os.path.isdir(file_path):
                 size = 0
@@ -654,11 +661,16 @@ class Scanner(QObject):
         comic_hash_ranges = {}  # comic_idx -> (start_idx, end_idx)
 
         current_idx = 0
+        duplicate_image_count = 0
         blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
             hash_array = comic.image_hash_array
+
+            # 同一本漫画中的图片哈希去重
+            hash_array = np.unique(hash_array, axis=0)
             hash_index = np.arange(len(hash_array))
+            duplicate_image_count += len(comic.image_hash_array) - len(hash_array)
 
             # 批量计算黑名单距离
             if len(blacklist_hashes) > 0:
@@ -688,8 +700,11 @@ class Scanner(QObject):
             logger.warning("没有有效的图片哈希")
             return duplicate_groups
 
+        total_image_count = (
+            len(all_hashes) + blacklist_image_count + duplicate_image_count
+        )
         logger.info(
-            f"成功构建了 {len(all_hashes)} 个图片哈希，其中 {blacklist_image_count} 个被排除在黑名单内"
+            f"成功构建了 {total_image_count} 个图片哈希，其中 {blacklist_image_count} 个被排除在黑名单内，{duplicate_image_count} 个被视为重复"
         )
 
         # 转换为numpy矩阵
