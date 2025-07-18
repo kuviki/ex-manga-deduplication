@@ -4,7 +4,7 @@
 用于显示选中漫画的图片预览
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -33,19 +33,25 @@ class ImageLoadThread(QThread):
         int, str, QPixmap, str
     )  # index, image_hash, pixmap, filename
     load_error = pyqtSignal(int, str)  # index, error_message
+    filename_loaded = pyqtSignal(
+        str, str, QPixmap, str
+    )  # filename, image_hash, pixmap, filename
+    filename_error = pyqtSignal(str, str)  # filename, error_message
 
     def __init__(
         self,
         comic_path: str,
         comic_hashes: List[Tuple[str, str]],
-        image_indices: List[int],
+        image_indices_or_names: Union[List[int], List[str]],
         max_size: tuple,
+        load_by_name: bool = False,
     ):
         super().__init__()
         self.comic_path = comic_path
         self.comic_hashes = comic_hashes
-        self.image_indices = image_indices
+        self.image_indices_or_names = image_indices_or_names
         self.max_size = max_size
+        self.load_by_name = load_by_name
         self._stop_requested = False
 
     def run(self):
@@ -59,50 +65,102 @@ class ImageLoadThread(QThread):
                 logger.error(f"压缩包中没有图片文件: {self.comic_path}")
                 return
 
-            for index in self.image_indices:
-                if self._stop_requested:
-                    break
-
-                try:
-                    # 确保索引在有效范围内
-                    if index < 0 or index >= len(image_files):
-                        logger.warning(
-                            f"图片索引超出范围: {index}, 总图片数: {len(image_files)}"
-                        )
-                        continue
-
-                    # 读取图片数据
-                    image_filename = image_files[index]
-                    image_data = archive_reader.read_image(
-                        self.comic_path, image_filename
-                    )
-                    if not image_data:
-                        continue
-
-                    # 创建QPixmap
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(image_data):
-                        # 缩放图片
-                        if self.max_size:
-                            pixmap = pixmap.scaled(
-                                self.max_size[0],
-                                self.max_size[1],
-                                Qt.KeepAspectRatio,
-                                Qt.SmoothTransformation,
-                            )
-
-                        # 获取图片哈希值
-                        image_hash_hex = self.comic_hashes[index][1]
-                        self.image_loaded.emit(
-                            index, image_hash_hex, pixmap, image_filename
-                        )
-
-                except Exception as e:
-                    logger.error(f"加载图片 {index} 失败: {e}")
-                    self.load_error.emit(index, str(e))
+            if self.load_by_name:
+                self._load_by_filename(archive_reader, image_files)
+            else:
+                self._load_by_index(archive_reader, image_files)
 
         except Exception as e:
             logger.error(f"加载漫画图片失败: {e}")
+
+    def _load_by_index(self, archive_reader, image_files):
+        """按索引加载图片"""
+        for index in self.image_indices_or_names:
+            if self._stop_requested:
+                break
+
+            try:
+                # 确保索引在有效范围内
+                if index < 0 or index >= len(image_files):
+                    logger.warning(
+                        f"图片索引超出范围: {index}, 总图片数: {len(image_files)}"
+                    )
+                    continue
+
+                # 读取图片数据
+                image_filename = image_files[index]
+                image_data = archive_reader.read_image(
+                    self.comic_path, image_filename
+                )
+                if not image_data:
+                    continue
+
+                # 创建QPixmap
+                pixmap = QPixmap()
+                if pixmap.loadFromData(image_data):
+                    # 缩放图片
+                    if self.max_size:
+                        pixmap = pixmap.scaled(
+                            self.max_size[0],
+                            self.max_size[1],
+                            Qt.KeepAspectRatio,
+                            Qt.SmoothTransformation,
+                        )
+
+                    # 获取图片哈希值
+                    image_hash_hex = self.comic_hashes[index][1]
+                    self.image_loaded.emit(
+                        index, image_hash_hex, pixmap, image_filename
+                    )
+
+            except Exception as e:
+                logger.error(f"加载图片 {index} 失败: {e}")
+                self.load_error.emit(index, str(e))
+
+    def _load_by_filename(self, archive_reader, image_files):
+        """按文件名加载图片"""
+        # 创建文件名到哈希的映射
+        filename_to_hash = {filename: hash_hex for filename, hash_hex in self.comic_hashes}
+        
+        for filename in self.image_indices_or_names:
+            if self._stop_requested:
+                break
+
+            try:
+                # 检查文件是否存在
+                if filename not in image_files:
+                    logger.warning(f"图片文件不存在: {filename}")
+                    self.filename_error.emit(filename, f"文件不存在: {filename}")
+                    continue
+
+                # 读取图片数据
+                image_data = archive_reader.read_image(
+                    self.comic_path, filename
+                )
+                if not image_data:
+                    continue
+
+                # 创建QPixmap
+                pixmap = QPixmap()
+                if pixmap.loadFromData(image_data):
+                    # 缩放图片
+                    if self.max_size:
+                        pixmap = pixmap.scaled(
+                            self.max_size[0],
+                            self.max_size[1],
+                            Qt.KeepAspectRatio,
+                            Qt.SmoothTransformation,
+                        )
+
+                    # 获取图片哈希值
+                    image_hash_hex = filename_to_hash.get(filename, "")
+                    self.filename_loaded.emit(
+                        filename, image_hash_hex, pixmap, filename
+                    )
+
+            except Exception as e:
+                logger.error(f"加载图片 {filename} 失败: {e}")
+                self.filename_error.emit(filename, str(e))
 
     def stop(self):
         """停止加载"""
@@ -125,8 +183,9 @@ class ImagePreviewWidget(QWidget):
         # 分批加载相关属性
         self.batch_size = 6  # 每批加载的图片数量
         self.loaded_count = 0  # 已加载的图片数量
-        self.total_indices = []  # 所有要加载的图片索引
+        self.total_items = []  # 所有要加载的图片索引或文件名
         self.is_loading = False  # 是否正在加载
+        self.load_by_name = False  # 是否按文件名加载
 
         self.init_ui()
 
@@ -233,10 +292,10 @@ class ImagePreviewWidget(QWidget):
 
         # 重置分批加载状态
         self.loaded_count = 0
-        self.total_indices = []
+        self.total_items = []
         self.is_loading = False
 
-        # 准备要加载的图片索引
+        # 准备要加载的图片索引或文件名
         if self.show_duplicates_only:
             self._prepare_duplicate_indices()
         else:
@@ -246,7 +305,7 @@ class ImagePreviewWidget(QWidget):
         self._load_next_batch()
 
     def _prepare_duplicate_indices(self):
-        """准备重复图片的索引"""
+        """准备重复图片的文件名"""
         if not self.current_group or not self.current_group.similar_hash_groups:
             self.status_label.setText("该重复组没有相似图片")
             return
@@ -270,18 +329,19 @@ class ImagePreviewWidget(QWidget):
             self.status_label.setText("当前漫画没有重复图片")
             return
 
-        # 按漫画原顺序排序
+        # 按漫画原顺序排序，收集文件名
         sorted_image_hashes = sorted(
             self.current_comic.image_hashes,
             key=lambda x: natural_sort_key(x[0]),
         )
-        self.total_indices = []
-        for index, sorted_image_hash in enumerate(sorted_image_hashes):
-            hash_hex = sorted_image_hash[1]
+        self.total_items = []
+        for filename, hash_hex in sorted_image_hashes:
             if hash_hex in target_hashes:
-                self.total_indices.append(index)
+                self.total_items.append(filename)
 
-        self.status_label.setText(f"找到 {len(self.total_indices)} 张重复图片")
+        # 设置按文件名加载
+        self.load_by_name = True
+        self.status_label.setText(f"找到 {len(self.total_items)} 张重复图片")
 
     def _prepare_all_indices(self):
         """准备全部图片的索引"""
@@ -291,23 +351,24 @@ class ImagePreviewWidget(QWidget):
             self.status_label.setText("该漫画没有图片")
             return
 
-        # 按顺序加载所有图片
-        self.total_indices = list(range(total_images))
-        self.status_label.setText(f"共 {len(self.total_indices)} 张图片")
+        # 按顺序加载所有图片（使用索引）
+        self.total_items = list(range(total_images))
+        self.load_by_name = False
+        self.status_label.setText(f"共 {len(self.total_items)} 张图片")
 
     def _load_next_batch(self):
         """加载下一批图片"""
-        if self.is_loading or self.loaded_count >= len(self.total_indices):
+        if self.is_loading or self.loaded_count >= len(self.total_items):
             return
 
         self.is_loading = True
 
-        # 计算本批次要加载的图片索引
+        # 计算本批次要加载的图片索引或文件名
         start_index = self.loaded_count
-        end_index = min(start_index + self.batch_size, len(self.total_indices))
-        batch_indices = self.total_indices[start_index:end_index]
+        end_index = min(start_index + self.batch_size, len(self.total_items))
+        batch_items = self.total_items[start_index:end_index]
 
-        if not batch_indices:
+        if not batch_items:
             self.is_loading = False
             return
 
@@ -318,11 +379,19 @@ class ImagePreviewWidget(QWidget):
         self.load_thread = ImageLoadThread(
             self.current_comic.path,
             self.current_comic.image_hashes,
-            batch_indices,
+            batch_items,
             preview_size,
+            self.load_by_name,
         )
-        self.load_thread.image_loaded.connect(self.on_image_loaded)
-        self.load_thread.load_error.connect(self.on_image_load_error)
+        
+        # 连接信号
+        if self.load_by_name:
+            self.load_thread.filename_loaded.connect(self.on_filename_loaded)
+            self.load_thread.filename_error.connect(self.on_filename_load_error)
+        else:
+            self.load_thread.image_loaded.connect(self.on_image_loaded)
+            self.load_thread.load_error.connect(self.on_image_load_error)
+            
         self.load_thread.finished.connect(self.on_batch_load_finished)
 
         # 显示加载状态
@@ -334,7 +403,7 @@ class ImagePreviewWidget(QWidget):
     def on_batch_load_finished(self):
         """处理批次加载完成"""
         self.loaded_count = len(self.image_pixmaps)
-        total_count = len(self.total_indices)
+        total_count = len(self.total_items)
 
         if self.loaded_count >= total_count:
             self.status_label.setText(f"已加载全部 {self.loaded_count} 张图片")
@@ -348,13 +417,13 @@ class ImagePreviewWidget(QWidget):
 
     def on_scroll_changed(self, value):
         """滚动条变化时的处理"""
-        if not self.total_indices or self.is_loading:
+        if not self.total_items or self.is_loading:
             return
 
         # 检查是否滚动到底部附近（距离底部小于100像素时开始加载）
         scrollbar = self.scroll_area.verticalScrollBar()
         if scrollbar.maximum() - value < 100 and self.loaded_count < len(
-            self.total_indices
+            self.total_items
         ):
             self._load_next_batch()
 
@@ -364,6 +433,18 @@ class ImagePreviewWidget(QWidget):
         """处理图片加载完成"""
         self.image_pixmaps[index] = pixmap
         self.add_image_to_display(index, image_hash, pixmap, filename)
+
+    def on_filename_loaded(
+        self, filename: str, image_hash: str, pixmap: QPixmap, display_filename: str
+    ):
+        """处理按文件名加载的图片完成"""
+        self.image_pixmaps[filename] = pixmap
+        self.add_filename_image_to_display(filename, image_hash, pixmap, display_filename)
+
+    def on_filename_load_error(self, filename: str, error_message: str):
+        """处理按文件名加载的图片错误"""
+        logger.warning(f"图片文件 {filename} 加载失败: {error_message}")
+        self.add_error_placeholder_for_filename(filename, error_message)
 
     def on_duplicate_image_load_error(self, image_hash: str, error_message: str):
         """处理重复图片加载错误"""
@@ -419,6 +500,72 @@ class ImagePreviewWidget(QWidget):
 
         # 存储索引信息
         frame.image_index = index
+
+    def add_error_placeholder_for_filename(self, filename: str, error_message: str):
+        """为按文件名加载添加错误占位符"""
+        frame = QFrame()
+        frame.setFrameStyle(QFrame.Box)
+        frame.setLineWidth(1)
+        frame.setStyleSheet("background-color: #ffebee;")
+
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(5, 5, 5, 5)
+
+        # 错误图标
+        error_label = QLabel("❌")
+        error_label.setAlignment(Qt.AlignCenter)
+        error_label.setStyleSheet("font-size: 24px;")
+
+        # 错误信息
+        info_text = f"图片: {filename}\n加载失败"
+        info_label = QLabel(info_text)
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setStyleSheet("font-size: 10px; color: red;")
+        info_label.setToolTip(error_message)
+
+        frame_layout.addWidget(error_label)
+        frame_layout.addWidget(info_label)
+
+        # 直接添加到末尾
+        self.image_layout.addWidget(frame)
+
+        # 存储文件名信息
+        frame.image_filename = filename
+
+    def add_filename_image_to_display(
+        self, filename: str, image_hash: str, pixmap: QPixmap, display_filename: str
+    ):
+        """添加按文件名加载的图片到显示区域"""
+        # 创建图片框架
+        frame = QFrame()
+        frame.setFrameStyle(QFrame.Box)
+        frame.setLineWidth(1)
+
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(5, 5, 5, 5)
+
+        # 图片标签
+        image_label = QLabel()
+        image_label.setPixmap(pixmap)
+        image_label.setAlignment(Qt.AlignCenter)
+        image_label.setScaledContents(False)
+
+        # 图片信息 （可选择复制）
+        info_text = f"图片: {display_filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
+        info_label = QLabel(info_text)
+        info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        info_label.setWordWrap(True)
+        info_label.setAlignment(Qt.AlignCenter)
+        info_label.setStyleSheet("font-size: 10px; color: gray;")
+
+        frame_layout.addWidget(image_label)
+        frame_layout.addWidget(info_label)
+
+        # 直接添加到末尾（按文件名加载时保持原顺序）
+        self.image_layout.addWidget(frame)
+
+        # 存储文件名信息
+        frame.image_filename = filename
 
     def add_error_placeholder(self, index: int, error_message: str):
         """添加错误占位符"""
@@ -513,7 +660,7 @@ class ImagePreviewWidget(QWidget):
 
         # 重置分批加载状态
         self.loaded_count = 0
-        self.total_indices = []
+        self.total_items = []
         self.is_loading = False
 
     def clear(self):
