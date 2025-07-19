@@ -5,27 +5,29 @@
 """
 
 import os
-import time
 import pickle
-import traceback
 import re
-import numpy as np
-import imagehash
-from typing import Dict, List, Set, Tuple, Optional
-from datetime import datetime
+import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, List, Optional, Set, Tuple
+
+import imagehash
+import numpy as np
 from loguru import logger
-from PyQt5.QtCore import QObject, pyqtSignal
 from numpy.typing import NDArray
+from PyQt5.QtCore import QObject, pyqtSignal
 
-from src.utils.file_utils import is_supported_archive, is_comic_folder
+from src.utils.file_utils import is_comic_folder, is_supported_archive
 
-from .config_manager import ConfigManager
+from .. import __version__
 from .archive_reader import ArchiveReader
-from .image_hash import ImageHasher
 from .blacklist_manager import BlacklistManager
 from .cache_manager import CacheManager
+from .config_manager import ConfigManager
+from .image_hash import ImageHasher
 
 
 @dataclass
@@ -306,6 +308,7 @@ class Scanner(QObject):
                 "cached_duplicate_groups": cached_duplicate_groups,
                 "similarity_threshold": similarity_threshold,
                 "min_similar_images": min_similar_images,
+                "version": __version__,
             }
             with open("index.db", "wb") as f:
                 pickle.dump(
@@ -510,7 +513,8 @@ class Scanner(QObject):
         cached_duplicate_groups: List[CachedDuplicateGroup] = []
         try:
             with open("index.db", "rb") as f:
-                cache_data = pickle.load(f)
+                cache_data: dict = pickle.load(f)
+                version = cache_data.get("version", (1, 2, 1))
                 similar_comic_cache_dict = cache_data.get(
                     "similar_comic_cache_dict", {}
                 )
@@ -519,6 +523,11 @@ class Scanner(QObject):
                     "similarity_threshold", None
                 )
                 cached_min_similar_images = cache_data.get("min_similar_images", None)
+
+                # 版本检查
+                if version <= (1, 2, 1):
+                    cached_duplicate_groups = []
+                    logger.info("缓存版本过低，清空缓存的重复组")
 
                 # 最小相似图片减少时
                 if (
@@ -665,11 +674,11 @@ class Scanner(QObject):
         blacklist_image_count = 0
         for comic_idx, comic in enumerate(valid_comics):
             start_idx = current_idx
-            hash_array = comic.image_hash_array
 
             # 同一本漫画中的图片哈希去重
-            hash_array = np.unique(hash_array, axis=0)
-            hash_index = np.arange(len(hash_array))
+            hash_array, hash_index = np.unique(
+                comic.image_hash_array, axis=0, return_index=True
+            )
             duplicate_image_count += len(comic.image_hash_array) - len(hash_array)
 
             # 批量计算黑名单距离
