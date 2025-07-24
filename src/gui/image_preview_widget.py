@@ -34,8 +34,8 @@ class ImageLoadThread(QThread):
     )  # index, image_hash, pixmap, filename
     load_error = pyqtSignal(int, str)  # index, error_message
     filename_loaded = pyqtSignal(
-        str, str, QPixmap, str
-    )  # filename, image_hash, pixmap, filename
+        int, str, str, QPixmap, str
+    )  # index, filename, image_hash, pixmap, filename
     filename_error = pyqtSignal(str, str)  # filename, error_message
 
     def __init__(
@@ -89,9 +89,7 @@ class ImageLoadThread(QThread):
 
                 # 读取图片数据
                 image_filename = image_files[index]
-                image_data = archive_reader.read_image(
-                    self.comic_path, image_filename
-                )
+                image_data = archive_reader.read_image(self.comic_path, image_filename)
                 if not image_data:
                     continue
 
@@ -117,11 +115,13 @@ class ImageLoadThread(QThread):
                 logger.error(f"加载图片 {index} 失败: {e}")
                 self.load_error.emit(index, str(e))
 
-    def _load_by_filename(self, archive_reader, image_files):
+    def _load_by_filename(self, archive_reader: ArchiveReader, image_files: List[str]):
         """按文件名加载图片"""
         # 创建文件名到哈希的映射
-        filename_to_hash = {filename: hash_hex for filename, hash_hex in self.comic_hashes}
-        
+        filename_to_hash = {
+            filename: hash_hex for filename, hash_hex in self.comic_hashes
+        }
+
         for filename in self.image_indices_or_names:
             if self._stop_requested:
                 break
@@ -134,9 +134,7 @@ class ImageLoadThread(QThread):
                     continue
 
                 # 读取图片数据
-                image_data = archive_reader.read_image(
-                    self.comic_path, filename
-                )
+                image_data = archive_reader.read_image(self.comic_path, filename)
                 if not image_data:
                     continue
 
@@ -152,10 +150,13 @@ class ImageLoadThread(QThread):
                             Qt.SmoothTransformation,
                         )
 
+                    # 查找索引
+                    index = image_files.index(filename)
+
                     # 获取图片哈希值
                     image_hash_hex = filename_to_hash.get(filename, "")
                     self.filename_loaded.emit(
-                        filename, image_hash_hex, pixmap, filename
+                        index, filename, image_hash_hex, pixmap, filename
                     )
 
             except Exception as e:
@@ -383,7 +384,7 @@ class ImagePreviewWidget(QWidget):
             preview_size,
             self.load_by_name,
         )
-        
+
         # 连接信号
         if self.load_by_name:
             self.load_thread.filename_loaded.connect(self.on_filename_loaded)
@@ -391,7 +392,7 @@ class ImagePreviewWidget(QWidget):
         else:
             self.load_thread.image_loaded.connect(self.on_image_loaded)
             self.load_thread.load_error.connect(self.on_image_load_error)
-            
+
         self.load_thread.finished.connect(self.on_batch_load_finished)
 
         # 显示加载状态
@@ -435,11 +436,18 @@ class ImagePreviewWidget(QWidget):
         self.add_image_to_display(index, image_hash, pixmap, filename)
 
     def on_filename_loaded(
-        self, filename: str, image_hash: str, pixmap: QPixmap, display_filename: str
+        self,
+        index: int,
+        filename: str,
+        image_hash: str,
+        pixmap: QPixmap,
+        display_filename: str,
     ):
         """处理按文件名加载的图片完成"""
         self.image_pixmaps[filename] = pixmap
-        self.add_filename_image_to_display(filename, image_hash, pixmap, display_filename)
+        self.add_filename_image_to_display(
+            index, filename, image_hash, pixmap, display_filename
+        )
 
     def on_filename_load_error(self, filename: str, error_message: str):
         """处理按文件名加载的图片错误"""
@@ -533,7 +541,12 @@ class ImagePreviewWidget(QWidget):
         frame.image_filename = filename
 
     def add_filename_image_to_display(
-        self, filename: str, image_hash: str, pixmap: QPixmap, display_filename: str
+        self,
+        index: int,
+        filename: str,
+        image_hash: str,
+        pixmap: QPixmap,
+        display_filename: str,
     ):
         """添加按文件名加载的图片到显示区域"""
         # 创建图片框架
@@ -551,7 +564,7 @@ class ImagePreviewWidget(QWidget):
         image_label.setScaledContents(False)
 
         # 图片信息 （可选择复制）
-        info_text = f"图片: {display_filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
+        info_text = f"图片[{index + 1}]: {display_filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
         info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         info_label.setWordWrap(True)
