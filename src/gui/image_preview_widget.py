@@ -33,9 +33,6 @@ class ImageLoadThread(QThread):
         int, str, QPixmap, str
     )  # index, image_hash, pixmap, filename
     load_error = pyqtSignal(int, str)  # index, error_message
-    filename_loaded = pyqtSignal(
-        int, str, str, QPixmap, str
-    )  # index, filename, image_hash, pixmap, filename
     filename_error = pyqtSignal(str, str)  # filename, error_message
 
     def __init__(
@@ -155,9 +152,7 @@ class ImageLoadThread(QThread):
 
                     # 获取图片哈希值
                     image_hash_hex = filename_to_hash.get(filename, "")
-                    self.filename_loaded.emit(
-                        index, filename, image_hash_hex, pixmap, filename
-                    )
+                    self.image_loaded.emit(index, image_hash_hex, pixmap, filename)
 
             except Exception as e:
                 logger.error(f"加载图片 {filename} 失败: {e}")
@@ -386,11 +381,10 @@ class ImagePreviewWidget(QWidget):
         )
 
         # 连接信号
+        self.load_thread.image_loaded.connect(self.on_image_loaded)
         if self.load_by_name:
-            self.load_thread.filename_loaded.connect(self.on_filename_loaded)
             self.load_thread.filename_error.connect(self.on_filename_load_error)
         else:
-            self.load_thread.image_loaded.connect(self.on_image_loaded)
             self.load_thread.load_error.connect(self.on_image_load_error)
 
         self.load_thread.finished.connect(self.on_batch_load_finished)
@@ -535,46 +529,6 @@ class ImagePreviewWidget(QWidget):
         frame_layout.addWidget(info_label)
 
         # 直接添加到末尾
-        self.image_layout.addWidget(frame)
-
-        # 存储文件名信息
-        frame.image_filename = filename
-
-    def add_filename_image_to_display(
-        self,
-        index: int,
-        filename: str,
-        image_hash: str,
-        pixmap: QPixmap,
-        display_filename: str,
-    ):
-        """添加按文件名加载的图片到显示区域"""
-        # 创建图片框架
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Box)
-        frame.setLineWidth(1)
-
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(5, 5, 5, 5)
-
-        # 图片标签
-        image_label = QLabel()
-        image_label.setPixmap(pixmap)
-        image_label.setAlignment(Qt.AlignCenter)
-        image_label.setScaledContents(False)
-
-        # 图片信息 （可选择复制）
-        info_text = f"图片[{index + 1}]: {display_filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
-        info_label = QLabel(info_text)
-        info_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        info_label.setWordWrap(True)
-        info_label.setAlignment(Qt.AlignCenter)
-        info_label.setStyleSheet("font-size: 10px; color: gray;")
-
-        frame_layout.addWidget(image_label)
-        frame_layout.addWidget(info_label)
-
-        # 直接添加到末尾（按文件名加载时保持原顺序）
         self.image_layout.addWidget(frame)
 
         # 存储文件名信息
