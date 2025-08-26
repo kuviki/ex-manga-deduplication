@@ -9,7 +9,7 @@ import subprocess
 from typing import Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QFont
+from PyQt5.QtGui import QBrush, QColor, QFont, QIcon
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -69,7 +69,7 @@ class DuplicateListWidget(QWidget):
         # 树形控件
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderLabels(
-            ["漫画文件", "大小", "图片数 (重复图片)", "相似度"]
+            ["漫画文件", "大小", "图片数 (重复图片)", "相似度", "操作"]
         )
         self.tree_widget.setRootIsDecorated(True)
         self.tree_widget.setAlternatingRowColors(True)
@@ -77,7 +77,7 @@ class DuplicateListWidget(QWidget):
 
         # 设置列宽和排序
         header = self.tree_widget.header()
-        self.tree_widget.setColumnWidth(0, 350)
+        self.tree_widget.setColumnWidth(0, 330)
         header.setSectionResizeMode(0, QHeaderView.Interactive)
         header.setSectionResizeMode(1, QHeaderView.Interactive)
         header.setSectionResizeMode(2, QHeaderView.Interactive)
@@ -190,6 +190,10 @@ class DuplicateListWidget(QWidget):
                 comic_item.setFlags(comic_item.flags() | Qt.ItemIsUserCheckable)
                 comic_item.setCheckState(0, Qt.Unchecked)
 
+                # 创建并添加操作按钮
+                action_widget = self._create_action_buttons(comic_item, comic)
+                self.tree_widget.setItemWidget(comic_item, 4, action_widget)
+
                 # 根据 checked 状态设置背景色
                 if comic.path in self._checked_comic_paths:
                     comic_item.setBackground(
@@ -211,6 +215,72 @@ class DuplicateListWidget(QWidget):
         self.stats_label.setText(
             f"{len(self.duplicate_groups)} 组重复，共 {total_comics} 个文件"
         )
+
+    def _create_action_buttons(self, item, comic) -> QWidget:
+        """为漫画项目创建操作按钮"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(4, 0, 4, 0)
+        layout.setSpacing(4)
+
+        # 通用按钮样式
+        button_style = """
+            QPushButton {
+                background-color: transparent;
+                border: 0;
+                border-radius: 3px;
+                padding: 3px 3px;
+                margin: 0 2px;
+            }
+            QPushButton:hover {
+                background-color: #f0f0f0;
+                border: 1px solid #aaaaaa;
+            }
+            QPushButton:pressed {
+                background-color: #e0e0e0;
+            }
+            QPushButton:disabled {
+                color: #999999;
+                border: 1px solid #dddddd;
+            }
+        """
+
+        # 打开文件位置
+        open_location_btn = QPushButton("📁")
+        open_location_btn.setStyleSheet(button_style)
+        open_location_btn.setToolTip("打开文件位置")
+        open_location_btn.clicked.connect(lambda: self.open_file_location(comic.path))
+        layout.addWidget(open_location_btn)
+
+        # 用默认程序打开
+        open_default_btn = QPushButton("📄")
+        open_default_btn.setStyleSheet(button_style)
+        open_default_btn.setToolTip("用默认程序打开")
+        open_default_btn.clicked.connect(lambda: self.open_with_default(comic.path))
+        layout.addWidget(open_default_btn)
+
+        # 用漫画查看器打开
+        open_viewer_btn = QPushButton("🖼️")
+        open_viewer_btn.setStyleSheet(button_style)
+        open_viewer_btn.setToolTip("用漫画查看器打开")
+        open_viewer_btn.clicked.connect(lambda: self.open_with_viewer(comic.path))
+        viewer_path = self.config.get_comic_viewer_path()
+        if not viewer_path or not os.path.exists(viewer_path):
+            open_viewer_btn.setDisabled(True)
+        layout.addWidget(open_viewer_btn)
+
+        # 标记/取消标记
+        check_mark_btn = QPushButton("✅")
+        check_mark_btn.setStyleSheet(button_style)
+        check_mark_btn.setToolTip("切换已检查标记")
+        check_mark_btn.clicked.connect(
+            lambda: self._update_comic_checked_state(item, comic, not comic.checked)
+        )
+        layout.addWidget(check_mark_btn)
+
+        layout.addStretch()
+        widget.setLayout(layout)
+        return widget
 
     def on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """处理项目点击事件"""
