@@ -9,7 +9,7 @@ import subprocess
 from typing import Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QFont, QIcon
+from PyQt5.QtGui import QBrush, QColor, QFont, QKeySequence
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QShortcut,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -388,8 +389,8 @@ class DuplicateListWidget(QWidget):
         )
 
         # 取消选择同组其他文件
-        select_group_action = menu.addAction("取消选择同组文件")
-        select_group_action.triggered.connect(
+        unselect_group_action = menu.addAction("取消选择同组文件")
+        unselect_group_action.triggered.connect(
             lambda: self.select_group_items(data["group"], False)
         )
 
@@ -399,6 +400,29 @@ class DuplicateListWidget(QWidget):
         delete_action = menu.addAction("删除此文件")
         delete_action.triggered.connect(lambda: self.delete_comic(comic.path))
 
+        # 创建快捷键
+        shortcuts = {
+            "L": open_location_action,
+            "O": open_default_action,
+            "V": open_viewer_action,
+            "M": check_mark_action if len(selected_items) <= 1 else check_mark_action,
+            "U": uncheck_mark_action,
+            "Space": uncheck_action
+            if item.checkState(0) == Qt.Checked
+            else check_action,
+            "A": select_group_action,
+            "Shift+A": unselect_group_action,
+            "Delete": delete_action,
+        }
+
+        # 为菜单添加快捷键
+        for key, action in shortcuts.items():
+            shortcut = QShortcut(QKeySequence(key), menu)
+            action.setShortcut(key)
+            shortcut.activated.connect(action.trigger)
+            shortcut.activated.connect(menu.close)
+
+        # 显示菜单
         menu.exec_(self.tree_widget.mapToGlobal(position))
 
     def open_file_location(self, file_path: str):
