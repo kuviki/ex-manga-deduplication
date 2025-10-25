@@ -428,6 +428,10 @@ class DuplicateListWidget(QWidget):
         delete_action = menu.addAction("删除此文件")
         delete_action.triggered.connect(lambda: self.delete_comic(comic.path))
 
+        # 切换选中项勾选状态
+        toggle_check_action = menu.addAction("切换选中项勾选状态")
+        toggle_check_action.triggered.connect(self._toggle_selected_items_check_state)
+
         # 创建快捷键
         shortcuts = {
             "L": open_location_action,
@@ -435,9 +439,7 @@ class DuplicateListWidget(QWidget):
             "V": open_viewer_action,
             "M": check_mark_action if len(selected_items) <= 1 else check_mark_action,
             "U": uncheck_mark_action,
-            "Space": uncheck_action
-            if item.checkState(0) == Qt.Checked
-            else check_action,
+            "Space": toggle_check_action,
             "A": select_group_action,
             "Shift+A": unselect_group_action,
             "Delete": delete_action,
@@ -618,6 +620,18 @@ class DuplicateListWidget(QWidget):
             for child_index in range(group_item.childCount()):
                 child_item = group_item.child(child_index)
                 child_item.setCheckState(0, state)
+
+    def _toggle_selected_items_check_state(self):
+        """切换所有选中项的勾选状态"""
+        selected_items = self._get_selected_comic_items()
+        if not selected_items:
+            return
+            
+        # 切换每个选中项的状态
+        for item in selected_items:
+            current_state = item.checkState(0)
+            new_state = Qt.Unchecked if current_state == Qt.Checked else Qt.Checked
+            item.setCheckState(0, new_state)
 
     def _get_selected_comic_paths(self) -> List[str]:
         """获取选中的漫画路径列表"""
