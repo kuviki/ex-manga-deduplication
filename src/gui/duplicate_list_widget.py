@@ -529,9 +529,10 @@ class DuplicateListWidget(QWidget):
                 comic for comic in group.comics if comic.path not in deleted_paths
             ]
 
-            # 如果组中只剩一个漫画，移除整个组
-            if len(group.comics) <= 1:
-                self.duplicate_groups.remove(group)
+        # 如果组中只剩一个漫画，移除整个组
+        self.duplicate_groups = [
+            group for group in self.duplicate_groups if len(group.comics) > 1
+        ]
 
         # 从重复组中移除无效的图片哈希对
         for group in self.duplicate_groups:
@@ -567,9 +568,10 @@ class DuplicateListWidget(QWidget):
                 if any(h[1] in similar_hashes for h in comic.image_hashes)
             ]
 
-            # 如果组中只剩一个漫画，移除整个组
-            if len(group.comics) <= 1:
-                self.duplicate_groups.remove(group)
+        # 如果组中只剩一个漫画，移除整个组
+        self.duplicate_groups = [
+            group for group in self.duplicate_groups if len(group.comics) > 1
+        ]
 
         # 刷新显示
         self.refresh_list()
