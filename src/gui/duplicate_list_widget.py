@@ -135,82 +135,96 @@ class DuplicateListWidget(QWidget):
             return
 
         total_comics = 0
+        
+        # 预先创建样式对象，避免重复创建
+        bold_font = QFont()
+        bold_font.setBold(True)
+        group_background = QBrush(QColor(240, 240, 240))
+        checked_background = QBrush(QColor(220, 255, 220))
+        unchecked_background = QBrush(QColor(255, 255, 255))
+        
+        # 临时禁用UI更新以提高性能
+        self.tree_widget.setUpdatesEnabled(False)
 
-        for i, group in enumerate(self.duplicate_groups, 1):
-            # 创建组节点
-            group_item = QTreeWidgetItem(self.tree_widget)
-            group_item.setText(0, f"重复组 {i} ({len(group.comics)} 个文件)")
-            group_item.setText(3, f"{len(group.similar_hash_groups)} 组相似图片")
+        try:
+            for i, group in enumerate(self.duplicate_groups, 1):
+                # 创建组节点
+                group_item = QTreeWidgetItem(self.tree_widget)
+                group_item.setText(0, f"重复组 {i} ({len(group.comics)} 个文件)")
+                group_item.setText(3, f"{len(group.similar_hash_groups)} 组相似图片")
 
-            # 设置组节点样式
-            font = QFont()
-            font.setBold(True)
-            group_item.setFont(0, font)
-            group_item.setBackground(0, QBrush(QColor(240, 240, 240)))
+                # 设置组节点样式
+                group_item.setFont(0, bold_font)
+                group_item.setBackground(0, group_background)
 
-            # 存储组数据
-            group_item.setData(0, Qt.UserRole, {"type": "group", "group": group})
+                # 存储组数据
+                group_item.setData(0, Qt.UserRole, {"type": "group", "group": group})
 
-            # 收集当前漫画相关的重复图片哈希
-            group_image_hashes = set()
-            for hash1, hash2, _similarity in group.similar_hash_groups:
-                group_image_hashes.add(hash1)
-                group_image_hashes.add(hash2)
+                # 预处理哈希数据，避免内层循环重复计算
+                group_image_hashes = set()
+                
+                # 收集所有哈希值
+                for hash1, hash2, _similarity in group.similar_hash_groups:
+                    group_image_hashes.add(hash1)
+                    group_image_hashes.add(hash2)
+                
+                # 为每个漫画预计算重复图片数量
+                comic_duplicate_counts = []
+                for comic_idx, comic in enumerate(group.comics):
+                    duplicate_count = 0
+                    comic_hash_set = set(hash[1] for hash in comic.image_hashes)
+                    # 使用集合交集计算，比逐个判断更高效
+                    duplicate_count = len(comic_hash_set & group_image_hashes)
+                    comic_duplicate_counts.append(duplicate_count)
 
-            # 添加漫画节点
-            for comic in group.comics:
-                # 计算当前漫画的重复图片数量
-                comic_duplicate_count = 0
-                for hash in comic.image_hashes:
-                    if hash[1] in group_image_hashes:
-                        comic_duplicate_count += 1
+                # 添加漫画节点
+                for comic_idx, comic in enumerate(group.comics):
+                    comic_item = QTreeWidgetItem(group_item)
+                    comic_item.setText(0, os.path.basename(comic.path))
+                    comic_item.setText(1, self._format_file_size(comic.size))
+                    comic_item.setText(
+                        2, f"{len(comic.image_hashes)} ({comic_duplicate_counts[comic_idx]})"
+                    )
 
-                comic_item = QTreeWidgetItem(group_item)
-                comic_item.setText(0, os.path.basename(comic.path))
-                comic_item.setText(1, self._format_file_size(comic.size))
-                comic_item.setText(
-                    2, f"{len(comic.image_hashes)} ({comic_duplicate_count})"
-                )
+                    # 设置工具提示
+                    comic_item.setToolTip(0, comic.path)
 
-                # 设置工具提示
-                comic_item.setToolTip(0, comic.path)
+                    # 存储漫画数据
+                    comic_item.setData(
+                        0,
+                        Qt.UserRole,
+                        {
+                            "type": "comic",
+                            "comic": comic,
+                            "group": group,
+                            "duplicate_count": comic_duplicate_counts[comic_idx],
+                        },
+                    )
 
-                # 存储漫画数据
-                comic_item.setData(
-                    0,
-                    Qt.UserRole,
-                    {
-                        "type": "comic",
-                        "comic": comic,
-                        "group": group,
-                        "duplicate_count": comic_duplicate_count,
-                    },
-                )
+                    # 添加复选框
+                    comic_item.setFlags(comic_item.flags() | Qt.ItemIsUserCheckable)
+                    comic_item.setCheckState(0, Qt.Unchecked)
 
-                # 添加复选框
-                comic_item.setFlags(comic_item.flags() | Qt.ItemIsUserCheckable)
-                comic_item.setCheckState(0, Qt.Unchecked)
+                    # 创建并添加操作按钮
+                    action_widget = self._create_action_buttons(comic_item, comic)
+                    self.tree_widget.setItemWidget(comic_item, 4, action_widget)
 
-                # 创建并添加操作按钮
-                action_widget = self._create_action_buttons(comic_item, comic)
-                self.tree_widget.setItemWidget(comic_item, 4, action_widget)
+                    # 根据 checked 状态设置背景色
+                    if comic.path in self._checked_comic_paths:
+                        comic_item.setBackground(0, checked_background)
+                        comic.checked = True
+                    else:
+                        comic_item.setBackground(0, unchecked_background)
+                        comic.checked = False
 
-                # 根据 checked 状态设置背景色
-                if comic.path in self._checked_comic_paths:
-                    comic_item.setBackground(
-                        0, QBrush(QColor(220, 255, 220))
-                    )  # 浅绿色背景
-                    comic.checked = True
-                else:
-                    comic_item.setBackground(
-                        0, QBrush(QColor(255, 255, 255))
-                    )  # 白色背景
-                    comic.checked = False
+                    total_comics += 1
 
-                total_comics += 1
+                # 展开组节点
+                group_item.setExpanded(True)
 
-            # 展开组节点
-            group_item.setExpanded(True)
+        finally:
+            # 重新启用UI更新
+            self.tree_widget.setUpdatesEnabled(True)
 
         # 更新统计信息
         self.stats_label.setText(
@@ -230,7 +244,7 @@ class DuplicateListWidget(QWidget):
                 background-color: transparent;
                 border: 0;
                 border-radius: 3px;
-                padding: 3px 3px;
+                padding: 2px 2px;
                 margin: 0 2px;
             }
             QPushButton:hover {
