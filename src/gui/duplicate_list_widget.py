@@ -95,6 +95,10 @@ class DuplicateListWidget(QWidget):
 
         layout.addWidget(self.tree_widget)
 
+        # 添加全局空格键快捷键，用于切换选中项的勾选状态
+        self.space_shortcut = QShortcut(QKeySequence(Qt.Key_Space), self.tree_widget)
+        self.space_shortcut.activated.connect(self._toggle_selected_items_check_state)
+
         # 控制按钮
         button_layout = QHBoxLayout()
 
