@@ -205,10 +205,6 @@ class DuplicateListWidget(QWidget):
                     comic_item.setFlags(comic_item.flags() | Qt.ItemIsUserCheckable)
                     comic_item.setCheckState(0, Qt.Unchecked)
 
-                    # 创建并添加操作按钮
-                    action_widget = self._create_action_buttons(comic_item, comic)
-                    self.tree_widget.setItemWidget(comic_item, 4, action_widget)
-
                     # 根据 checked 状态设置背景色
                     if comic.path in self._checked_comic_paths:
                         comic_item.setBackground(0, checked_background)
@@ -304,6 +300,9 @@ class DuplicateListWidget(QWidget):
 
     def on_selection_changed(self):
         """处理选择变化事件（支持鼠标点击、右键、键盘方向键等）"""
+        # 先清除所有现有的操作按钮
+        self._clear_all_action_buttons()
+        
         selected_items = self.tree_widget.selectedItems()
         if not selected_items:
             return
@@ -315,10 +314,25 @@ class DuplicateListWidget(QWidget):
             return
 
         if data["type"] == "comic":
+            # 创建并添加操作按钮
+            action_widget = self._create_action_buttons(item, data["comic"])
+            self.tree_widget.setItemWidget(item, 4, action_widget)
+            
             # 发射漫画选择信号
             self.comic_selected.emit(
                 data["comic"], data["group"], data["duplicate_count"]
             )
+    
+    def _clear_all_action_buttons(self):
+        """清除所有操作按钮"""
+        # 遍历所有项目
+        root = self.tree_widget.invisibleRootItem()
+        for i in range(root.childCount()):
+            group_item = root.child(i)
+            for j in range(group_item.childCount()):
+                comic_item = group_item.child(j)
+                # 清除操作按钮
+                self.tree_widget.setItemWidget(comic_item, 4, None)
 
     def show_context_menu(self, position):
         """显示右键菜单"""
