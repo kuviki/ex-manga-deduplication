@@ -8,9 +8,11 @@ import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
+from loguru import logger
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QFont, QKeySequence
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -23,7 +25,6 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from loguru import logger
 from win32com.shell import shell
 
 from ..core.config_manager import ConfigManager
@@ -46,6 +47,7 @@ class DuplicateListWidget(QWidget):
         self._checked_comic_paths = set(
             self.config.get_checked_comic_paths()
         )  # 加载已检查的漫画路径
+        self._show_only_unchecked_groups = True  # 是否仅显示存在未检查的重复组
         self.init_ui()
 
     def init_ui(self):
@@ -66,6 +68,15 @@ class DuplicateListWidget(QWidget):
         header_layout.addWidget(self.stats_label)
 
         layout.addLayout(header_layout)
+
+        # 过滤选项
+        filter_layout = QHBoxLayout()
+        self.show_unchecked_checkbox = QCheckBox("仅显示未检查组")
+        self.show_unchecked_checkbox.setChecked(self._show_only_unchecked_groups)
+        self.show_unchecked_checkbox.stateChanged.connect(self._on_filter_changed)
+        filter_layout.addWidget(self.show_unchecked_checkbox)
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
 
         # 树形控件
         self.tree_widget = QTreeWidget()
@@ -130,6 +141,11 @@ class DuplicateListWidget(QWidget):
         self.duplicate_groups = duplicate_groups
         self.refresh_list()
 
+    def _on_filter_changed(self, state):
+        """处理过滤选项改变"""
+        self._show_only_unchecked_groups = state == Qt.Checked
+        self.refresh_list()
+
     def refresh_list(self):
         """刷新列表显示"""
         self.tree_widget.clear()
@@ -139,23 +155,35 @@ class DuplicateListWidget(QWidget):
             return
 
         total_comics = 0
-        
+        visible_groups = 0
+
         # 预先创建样式对象，避免重复创建
         bold_font = QFont()
         bold_font.setBold(True)
         group_background = QBrush(QColor(240, 240, 240))
         checked_background = QBrush(QColor(220, 255, 220))
         unchecked_background = QBrush(QColor(255, 255, 255))
-        
+
         # 临时禁用UI更新以提高性能
         self.tree_widget.setUpdatesEnabled(False)
 
         try:
             for i, group in enumerate(self.duplicate_groups, 1):
+                # 检查是否需要过滤此组（仅显示存在未检查的重复组）
+                if self._show_only_unchecked_groups:
+                    # 检查组中是否存在未检查的漫画
+                    has_unchecked = any(
+                        comic.path not in self._checked_comic_paths
+                        for comic in group.comics
+                    )
+                    if not has_unchecked:
+                        continue  # 跳过此组，因为所有漫画都已检查
+
                 # 创建组节点
                 group_item = QTreeWidgetItem(self.tree_widget)
                 group_item.setText(0, f"重复组 {i} ({len(group.comics)} 个文件)")
                 group_item.setText(3, f"{len(group.similar_hash_groups)} 组相似图片")
+                visible_groups += 1
 
                 # 设置组节点样式
                 group_item.setFont(0, bold_font)
@@ -166,12 +194,12 @@ class DuplicateListWidget(QWidget):
 
                 # 预处理哈希数据，避免内层循环重复计算
                 group_image_hashes = set()
-                
+
                 # 收集所有哈希值
                 for hash1, hash2, _similarity in group.similar_hash_groups:
                     group_image_hashes.add(hash1)
                     group_image_hashes.add(hash2)
-                
+
                 # 为每个漫画预计算重复图片数量
                 comic_duplicate_counts = []
                 for comic_idx, comic in enumerate(group.comics):
@@ -187,7 +215,8 @@ class DuplicateListWidget(QWidget):
                     comic_item.setText(0, os.path.basename(comic.path))
                     comic_item.setText(1, self._format_file_size(comic.size))
                     comic_item.setText(
-                        2, f"{len(comic.image_hashes)} ({comic_duplicate_counts[comic_idx]})"
+                        2,
+                        f"{len(comic.image_hashes)} ({comic_duplicate_counts[comic_idx]})",
                     )
 
                     # 设置工具提示
@@ -227,9 +256,14 @@ class DuplicateListWidget(QWidget):
             self.tree_widget.setUpdatesEnabled(True)
 
         # 更新统计信息
-        self.stats_label.setText(
-            f"{len(self.duplicate_groups)} 组重复，共 {total_comics} 个文件"
-        )
+        if self._show_only_unchecked_groups:
+            self.stats_label.setText(
+                f"显示 {visible_groups}/{len(self.duplicate_groups)} 组重复，共 {total_comics} 个文件"
+            )
+        else:
+            self.stats_label.setText(
+                f"{len(self.duplicate_groups)} 组重复，共 {total_comics} 个文件"
+            )
 
     def _create_action_buttons(self, item, comic) -> QWidget:
         """为漫画项目创建操作按钮"""
@@ -306,7 +340,7 @@ class DuplicateListWidget(QWidget):
         """处理选择变化事件（支持鼠标点击、右键、键盘方向键等）"""
         # 先清除所有现有的操作按钮
         self._clear_all_action_buttons()
-        
+
         selected_items = self.tree_widget.selectedItems()
         if not selected_items:
             return
@@ -321,12 +355,12 @@ class DuplicateListWidget(QWidget):
             # 创建并添加操作按钮
             action_widget = self._create_action_buttons(item, data["comic"])
             self.tree_widget.setItemWidget(item, 4, action_widget)
-            
+
             # 发射漫画选择信号
             self.comic_selected.emit(
                 data["comic"], data["group"], data["duplicate_count"]
             )
-    
+
     def _clear_all_action_buttons(self):
         """清除所有操作按钮"""
         # 遍历所有项目
@@ -630,7 +664,7 @@ class DuplicateListWidget(QWidget):
         selected_items = self._get_selected_comic_items()
         if not selected_items:
             return
-            
+
         # 切换每个选中项的状态
         for item in selected_items:
             current_state = item.checkState(0)
@@ -685,6 +719,10 @@ class DuplicateListWidget(QWidget):
         # 持久化已检查的漫画路径
         self.config.set_checked_comic_paths(list(self._checked_comic_paths))
         self.config.save_config()
+
+        # 如果启用了过滤，刷新列表以反映变化
+        if self._show_only_unchecked_groups:
+            self.refresh_list()
 
     def _update_comic_checked_state(
         self, item: QTreeWidgetItem, comic: object, checked: Optional[bool] = None
