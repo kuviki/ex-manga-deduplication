@@ -5,25 +5,26 @@
 """
 
 from typing import List, Tuple, Union
+
+from loguru import logger
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QApplication,
+    QFrame,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
     QPushButton,
-    QFrame,
-    QApplication,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QPixmap, QFont
-from loguru import logger
 
 from src.utils.file_utils import natural_sort_key
 
+from ..core.archive_reader import ArchiveReader
 from ..core.config_manager import ConfigManager
 from ..core.scanner import ComicInfo, DuplicateGroup
-from ..core.archive_reader import ArchiveReader
 
 
 class ImageLoadThread(QThread):

@@ -4,12 +4,14 @@
 应用程序的主要用户界面
 """
 
-from datetime import datetime, timedelta
 import os
 import time
+from datetime import datetime, timedelta
 from typing import List, Optional
 
-from PyQt5.QtCore import QThread, Qt
+import PyTaskbar
+from loguru import logger
+from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
     QAction,
@@ -35,13 +37,11 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import PyTaskbar
-from loguru import logger
 from send2trash import send2trash
 
 from .. import __version__
 from ..core.config_manager import ConfigManager
-from ..core.scanner import ComicInfo, DuplicateGroup, ScanProgress, Scanner
+from ..core.scanner import ComicInfo, DuplicateGroup, Scanner, ScanProgress
 from .about_dialog import AboutDialog
 from .duplicate_list_widget import DuplicateListWidget
 from .image_preview_widget import ImagePreviewWidget
