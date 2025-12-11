@@ -11,7 +11,7 @@ from typing import List, Optional
 
 import PyTaskbar
 from loguru import logger
-from PyQt5.QtCore import Qt, QThread
+from PyQt5.QtCore import Qt, QThread, QTimer
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import (
     QAction,
@@ -91,6 +91,16 @@ class MainWindow(QMainWindow):
         self.scanner = Scanner(self.config)
         self.scan_thread = None
         self.current_duplicates = []
+
+        # 选区变化防抖定时器
+        self.selection_debounce_timer = QTimer()
+        self.selection_debounce_timer.setSingleShot(True)
+        self.selection_debounce_timer.setInterval(200)
+        self.selection_debounce_timer.timeout.connect(
+            self.on_selection_debounce_timeout
+        )
+        self._pending_comic_data = None
+        self._pending_multi_data = None
 
         self.init_ui()
         self.load_settings()
@@ -684,20 +694,35 @@ class MainWindow(QMainWindow):
         self, comic: ComicInfo, group: DuplicateGroup, duplicate_count: int
     ):
         """处理漫画选中事件"""
-        # 更新详情信息
-        info = f"文件路径: {comic.path.replace('/', '\\')}\n"
-        info += f"文件大小: {self.duplicate_list._format_file_size(comic.size)}\n"
-        info += f"图片数: {len(comic.image_hashes)}\n"
-        info += f"重复图片数: {duplicate_count}\n"
-        info += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic.mtime))}\n"
-        self.info_text.setText(info)
-
-        # 更新图片预览
-        self.image_preview.set_comic(comic, group)
+        # 保存待处理数据并启动/重启防抖定时器
+        self._pending_comic_data = (comic, group, duplicate_count)
+        self.selection_debounce_timer.start()
 
     def on_multi_selection_changed(self, comics: List[ComicInfo]):
         """处理多选变化"""
-        self.image_preview.set_compare_comics(comics)
+        # 保存待处理数据并启动/重启防抖定时器
+        self._pending_multi_data = comics
+        self.selection_debounce_timer.start()
+
+    def on_selection_debounce_timeout(self):
+        """防抖定时器超时，执行更新"""
+        if self._pending_comic_data:
+            comic, group, duplicate_count = self._pending_comic_data
+            # 更新详情信息
+            info = f"文件路径: {comic.path.replace('/', '\\')}\n"
+            info += f"文件大小: {self.duplicate_list._format_file_size(comic.size)}\n"
+            info += f"图片数: {len(comic.image_hashes)}\n"
+            info += f"重复图片数: {duplicate_count}\n"
+            info += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic.mtime))}\n"
+            self.info_text.setText(info)
+
+            # 更新图片预览
+            self.image_preview.set_comic(comic, group)
+            self._pending_comic_data = None
+
+        if self._pending_multi_data:
+            self.image_preview.set_compare_comics(self._pending_multi_data)
+            self._pending_multi_data = None
 
     def delete_comics(self, comic_paths: List[str]):
         """删除选中的漫画"""
