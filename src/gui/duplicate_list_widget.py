@@ -720,10 +720,6 @@ class DuplicateListWidget(QWidget):
         self.config.set_checked_comic_paths(list(self._checked_comic_paths))
         self.config.save_config()
 
-        # 如果启用了过滤，刷新列表以反映变化
-        if self._show_only_unchecked_groups:
-            self.refresh_list()
-
     def _update_comic_checked_state(
         self, item: QTreeWidgetItem, comic: object, checked: Optional[bool] = None
     ):
