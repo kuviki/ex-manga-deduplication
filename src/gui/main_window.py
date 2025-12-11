@@ -363,6 +363,9 @@ class MainWindow(QMainWindow):
         self.duplicate_list = DuplicateListWidget(self.config)
         self.duplicate_list.comic_selected.connect(self.on_comic_selected)
         self.duplicate_list.comics_to_delete.connect(self.delete_comics)
+        self.duplicate_list.multi_selection_changed.connect(
+            self.on_multi_selection_changed
+        )
 
         # 详情信息
         self.info_text = QTextEdit()
@@ -381,6 +384,8 @@ class MainWindow(QMainWindow):
 
         # 图片预览
         self.image_preview = ImagePreviewWidget(self.config)
+        # 预览组件信号
+        self.image_preview.refresh_needed.connect(self.start_scan)
 
         right_layout.addWidget(self.image_preview)
 
@@ -676,28 +681,23 @@ class MainWindow(QMainWindow):
         self.status_label.setText("扫描进行中...")
 
     def on_comic_selected(
-        self,
-        comic_info: ComicInfo,
-        duplicate_group: DuplicateGroup,
-        duplicate_count: int,
+        self, comic: ComicInfo, group: DuplicateGroup, duplicate_count: int
     ):
-        """处理漫画选择"""
-        # 显示漫画信息
-        info_text = f"文件路径: {comic_info.path.replace('/', '\\')}\n"
-        info_text += f"文件大小: {comic_info.size / 1024 / 1024:.2f} MB\n"
-        info_text += f"图片数量: {len(comic_info.image_hashes)}\n"
-        info_text += f"重复图片数量: {duplicate_count}\n"
-        info_text += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic_info.mtime))}\n"
+        """处理漫画选中事件"""
+        # 更新详情信息
+        info = f"文件路径: {comic.path.replace('/', '\\')}\n"
+        info += f"文件大小: {self.duplicate_list._format_file_size(comic.size)}\n"
+        info += f"图片数: {len(comic.image_hashes)}\n"
+        info += f"重复图片数: {duplicate_count}\n"
+        info += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic.mtime))}\n"
+        self.info_text.setText(info)
 
-        if duplicate_group:
-            info_text += "\n重复组信息:\n"
-            info_text += f"相似图片组数: {len(duplicate_group.similar_hash_groups)}\n"
-            info_text += f"组内漫画数量: {len(duplicate_group.comics)}\n"
+        # 更新图片预览
+        self.image_preview.set_comic(comic, group)
 
-        self.info_text.setText(info_text)
-
-        # 显示图片预览
-        self.image_preview.set_comic(comic_info, duplicate_group)
+    def on_multi_selection_changed(self, comics: List[ComicInfo]):
+        """处理多选变化"""
+        self.image_preview.set_compare_comics(comics)
 
     def delete_comics(self, comic_paths: List[str]):
         """删除选中的漫画"""

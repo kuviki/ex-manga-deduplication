@@ -6,6 +6,7 @@
 
 from typing import List, Tuple, Union
 
+import imagehash
 from loguru import logger
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QPixmap
@@ -167,11 +168,14 @@ class ImageLoadThread(QThread):
 class ImagePreviewWidget(QWidget):
     """图片预览组件"""
 
+    refresh_needed = pyqtSignal()
+
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
         self.config = config_manager
         self.current_comic = None
         self.current_group = None
+        self.compare_comics = []  # 要对比的漫画列表
         self.image_pixmaps = {}  # {index: QPixmap} or {hash: QPixmap}
         self.load_thread = None
         self.show_duplicates_only = True  # 新增：是否只显示重复图片
@@ -258,6 +262,13 @@ class ImagePreviewWidget(QWidget):
         # 加载预览图片
         self.load_preview_images()
 
+    def set_compare_comics(self, comics: List[ComicInfo]):
+        """设置要对比的漫画列表"""
+        self.compare_comics = comics
+        # 如果当前有选中的漫画和组，重新加载图片
+        if self.current_comic and self.current_group:
+            self.load_preview_images()
+
     def update_info_display(self):
         """更新漫画信息显示"""
         if not self.current_comic:
@@ -313,11 +324,42 @@ class ImagePreviewWidget(QWidget):
         )
         target_hashes = []
 
-        for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
-            if hash1 in current_comic_hashes:
-                target_hashes.append(hash1)
-            if hash2 in current_comic_hashes:
-                target_hashes.append(hash2)
+        # 确定要对比的漫画
+        other_comics = []
+        if self.compare_comics:
+            other_comics = [
+                c
+                for c in self.compare_comics
+                if c != self.current_comic and c in self.current_group.comics
+            ]
+
+        if other_comics:
+            # 使用imagehash和配置进行对比
+            algo = self.config.get_hash_algorithm()
+            threshold = self.config.get_similarity_threshold(algo)
+
+            other_hashes = set()
+            for c in other_comics:
+                for _, h in c.image_hashes:
+                    other_hashes.add(h)
+
+            other_hash_objs = [imagehash.hex_to_hash(h) for h in other_hashes]
+
+            for filename, hash_hex in self.current_comic.image_hashes:
+                current_hash_obj = imagehash.hex_to_hash(hash_hex)
+                is_similar = False
+                for other_hash_obj in other_hash_objs:
+                    if current_hash_obj - other_hash_obj <= threshold:
+                        is_similar = True
+                        break
+                if is_similar:
+                    target_hashes.append(hash_hex)
+        else:
+            for hash1, hash2, _similarity in self.current_group.similar_hash_groups:
+                if hash1 in current_comic_hashes:
+                    target_hashes.append(hash1)
+                if hash2 in current_comic_hashes:
+                    target_hashes.append(hash2)
 
         # 去重
         target_hashes = set(target_hashes)

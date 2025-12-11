@@ -39,6 +39,7 @@ class DuplicateListWidget(QWidget):
         object, object, int
     )  # ComicInfo, DuplicateGroup, duplicate_count
     comics_to_delete = pyqtSignal(list)  # List[str] - comic paths
+    multi_selection_changed = pyqtSignal(list)  # List[ComicInfo]
 
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
@@ -360,6 +361,14 @@ class DuplicateListWidget(QWidget):
             self.comic_selected.emit(
                 data["comic"], data["group"], data["duplicate_count"]
             )
+
+        # 处理多选变化
+        selected_comics = []
+        for item in selected_items:
+            data = item.data(0, Qt.UserRole)
+            if data and data["type"] == "comic":
+                selected_comics.append(data["comic"])
+        self.multi_selection_changed.emit(selected_comics)
 
     def _clear_all_action_buttons(self):
         """清除所有操作按钮"""
