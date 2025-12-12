@@ -346,7 +346,7 @@ class Scanner(QObject):
             if name_filter_regex:
                 try:
                     comic_name = os.path.basename(file_path)
-                    if name_filter_regex.search(comic_name):
+                    if name_filter_regex.search(comic_name.strip()):
                         logger.debug(f"名称筛选排除: {comic_name}")
                         return None
                 except Exception as e:
