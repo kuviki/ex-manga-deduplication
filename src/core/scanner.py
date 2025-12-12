@@ -337,6 +337,10 @@ class Scanner(QObject):
             modified_before: 修改时间筛选结束时间
             name_filter_regex: 编译后的正则表达式对象，用于名称筛选，匹配的漫画将被排除
         """
+        # 等待暂停
+        while self.is_paused and not self.should_stop:
+            time.sleep(0.1)
+
         try:
             # 名称筛选检查
             if name_filter_regex:
