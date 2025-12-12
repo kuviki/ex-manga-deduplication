@@ -8,7 +8,6 @@ import os
 import re
 import time
 from datetime import datetime, timedelta
-from typing import List, Optional
 
 import PyTaskbar
 from loguru import logger
@@ -57,11 +56,11 @@ class ScanThread(QThread):
         self,
         scanner: Scanner,
         directory: str,
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        modified_after: Optional[datetime] = None,
-        modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[re.Pattern] = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        modified_after: datetime | None = None,
+        modified_before: datetime | None = None,
+        name_filter_regex: re.Pattern | None = None,
     ):
         super().__init__()
         self.scanner = scanner
@@ -135,9 +134,11 @@ class MainWindow(QMainWindow):
     def create_menu_bar(self):
         """创建菜单栏"""
         menubar = self.menuBar()
+        assert menubar is not None, "菜单栏创建失败"
 
         # 文件菜单
         file_menu = menubar.addMenu("文件(&F)")
+        assert file_menu is not None, "文件菜单创建失败"
 
         # 选择目录
         select_dir_action = QAction("选择扫描目录(&O)", self)
@@ -162,6 +163,7 @@ class MainWindow(QMainWindow):
 
         # 工具菜单
         tools_menu = menubar.addMenu("工具(&T)")
+        assert tools_menu is not None, "工具菜单创建失败"
 
         # 设置
         settings_action = QAction("设置(&S)", self)
@@ -188,6 +190,7 @@ class MainWindow(QMainWindow):
 
         # 帮助菜单
         help_menu = menubar.addMenu("帮助(&H)")
+        assert help_menu is not None, "帮助菜单创建失败"
 
         # 关于
         about_action = QAction("关于(&A)", self)
@@ -660,7 +663,7 @@ class MainWindow(QMainWindow):
             )
 
     def on_scan_completed(
-        self, duplicate_groups: List[DuplicateGroup], elapsed_time: float
+        self, duplicate_groups: list[DuplicateGroup], elapsed_time: float
     ):
         """处理扫描完成"""
         self.current_duplicates = duplicate_groups
@@ -709,7 +712,7 @@ class MainWindow(QMainWindow):
         self._pending_comic_data = (comic, group, duplicate_count)
         self.selection_debounce_timer.start()
 
-    def on_multi_selection_changed(self, comics: List[ComicInfo]):
+    def on_multi_selection_changed(self, comics: list[ComicInfo]):
         """处理多选变化"""
         # 保存待处理数据并启动/重启防抖定时器
         self._pending_multi_data = comics
@@ -735,7 +738,7 @@ class MainWindow(QMainWindow):
             self.image_preview.set_compare_comics(self._pending_multi_data)
             self._pending_multi_data = None
 
-    def delete_comics(self, comic_paths: List[str]):
+    def delete_comics(self, comic_paths: list[str]):
         """删除选中的漫画"""
         if not comic_paths:
             return
