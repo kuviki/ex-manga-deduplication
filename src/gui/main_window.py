@@ -5,6 +5,7 @@
 """
 
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -60,7 +61,7 @@ class ScanThread(QThread):
         created_before: Optional[datetime] = None,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[str] = None,
+        name_filter_regex: Optional[re.Pattern] = None,
     ):
         super().__init__()
         self.scanner = scanner
@@ -553,9 +554,18 @@ class MainWindow(QMainWindow):
             modified_before = self.modified_before_edit.dateTime().toPyDateTime()
 
         if self.name_filter_enabled.isChecked():
-            name_filter_regex = self.name_filter_edit.text().strip()
-            if not name_filter_regex:
-                name_filter_regex = None
+            name_filter_text = self.name_filter_edit.text().strip()
+            if name_filter_text:
+                try:
+                    name_filter_regex = re.compile(name_filter_text, re.IGNORECASE)
+                except re.error as e:
+                    QMessageBox.critical(
+                        self,
+                        "正则表达式错误",
+                        f"名称筛选正则表达式编译失败：\n{str(e)}\n\n请检查正则表达式语法。",
+                    )
+                    self.reset_scan_ui()
+                    return  # 停止扫描
 
         # 启动扫描线程
         self.scan_thread = ScanThread(

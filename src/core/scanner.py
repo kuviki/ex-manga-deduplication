@@ -120,7 +120,7 @@ class Scanner(QObject):
         created_before: Optional[datetime] = None,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[str] = None,
+        name_filter_regex: Optional[re.Pattern] = None,
     ) -> None:
         """扫描目录中的漫画文件
 
@@ -130,7 +130,7 @@ class Scanner(QObject):
             created_before: 创建时间筛选结束时间
             modified_after: 修改时间筛选起始时间
             modified_before: 修改时间筛选结束时间
-            name_filter_regex: 名称筛选正则表达式，匹配的漫画将被排除
+            name_filter_regex: 编译后的正则表达式对象，用于名称筛选，匹配的漫画将被排除
         """
         if self.is_scanning:
             logger.warning("扫描已在进行中")
@@ -242,7 +242,7 @@ class Scanner(QObject):
         created_before: Optional[datetime] = None,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[str] = None,
+        name_filter_regex: Optional[re.Pattern] = None,
     ) -> List[ComicInfo]:
         """处理漫画文件，提取图片哈希"""
         comic_infos = []
@@ -326,25 +326,34 @@ class Scanner(QObject):
         created_before: Optional[datetime] = None,
         modified_after: Optional[datetime] = None,
         modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[str] = None,
+        name_filter_regex: Optional[re.Pattern] = None,
     ) -> Optional[ComicInfo]:
-        """处理单个漫画文件或文件夹"""
+        """处理单个漫画文件或文件夹
+
+        Args:
+            file_path: 漫画文件路径
+            created_after: 创建时间筛选起始时间
+            created_before: 创建时间筛选结束时间
+            modified_after: 修改时间筛选起始时间
+            modified_before: 修改时间筛选结束时间
+            name_filter_regex: 编译后的正则表达式对象，用于名称筛选，匹配的漫画将被排除
+        """
         try:
             # 名称筛选检查
             if name_filter_regex:
                 try:
                     comic_name = os.path.basename(file_path)
-                    if re.search(name_filter_regex, comic_name, re.IGNORECASE):
+                    if name_filter_regex.search(comic_name):
                         logger.debug(f"名称筛选排除: {comic_name}")
                         return None
-                except re.error as e:
-                    logger.warning(f"正则表达式错误: {e}")
-                    # 如果正则表达式有错误，继续处理文件
+                except Exception as e:
+                    logger.warning(f"正则表达式搜索错误: {e}")
+                    # 如果正则表达式搜索有错误，继续处理文件
 
             # 获取文件/文件夹信息
             file_stat = os.stat(file_path)
             mtime = file_stat.st_mtime
-            ctime = file_stat.st_ctime  # 创建时间
+            ctime = file_stat.st_birthtime  # 创建时间
 
             # 时间过滤检查
             if created_after or created_before:
