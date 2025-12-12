@@ -12,7 +12,6 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Set, Tuple
 
 import imagehash
 import numpy as np
@@ -58,10 +57,10 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
-    image_hashes: List[Tuple[str, str]]  # [(filename, hash_hex)]
+    image_hashes: list[tuple[str, str]]  # [(filename, hash_hex)]
     image_hash_array: NDArray[np.uint64]
     cache_key: str  # 缓存键
-    error: Optional[str] = None
+    error: str = ""
     checked: bool = False  # 是否已检查标记
 
     def __hash__(self) -> int:
@@ -72,16 +71,16 @@ class ComicInfo:
 class DuplicateGroup:
     """重复漫画组"""
 
-    comics: List[ComicInfo]
-    similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
+    comics: list[ComicInfo]
+    similar_hash_groups: set[tuple[str, str, int]]  # (hash1, hash2, similarity)
 
 
 @dataclass
 class CachedDuplicateGroup:
     """缓存重复漫画组"""
 
-    comic_cache_keys: List[str]
-    similar_hash_groups: Set[Tuple[str, str, int]]  # (hash1, hash2, similarity)
+    comic_cache_keys: list[str]
+    similar_hash_groups: set[tuple[str, str, int]]  # (hash1, hash2, similarity)
 
 
 class Scanner(QObject):
@@ -89,7 +88,7 @@ class Scanner(QObject):
 
     # 信号定义
     progress_updated = pyqtSignal(ScanProgress)
-    scan_completed = pyqtSignal(list, float)  # List[DuplicateGroup], elapsed_time
+    scan_completed = pyqtSignal(list, float)  # list[DuplicateGroup], elapsed_time
     scan_error = pyqtSignal(str)
     scan_paused = pyqtSignal()
     scan_resumed = pyqtSignal()
@@ -116,11 +115,11 @@ class Scanner(QObject):
     def scan_directory(
         self,
         directory: str,
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        modified_after: Optional[datetime] = None,
-        modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[re.Pattern] = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        modified_after: datetime | None = None,
+        modified_before: datetime | None = None,
+        name_filter_regex: re.Pattern | None = None,
     ) -> None:
         """扫描目录中的漫画文件
 
@@ -213,7 +212,7 @@ class Scanner(QObject):
             elif self.progress.stage == "processing":
                 logger.info("正在停止处理...")
 
-    def _find_comic_files(self, directory: str) -> List[str]:
+    def _find_comic_files(self, directory: str) -> list[str]:
         """查找目录中的所有漫画文件和漫画文件夹"""
         comic_files = []
         processed_dirs = set()  # 避免重复处理子目录
@@ -237,13 +236,13 @@ class Scanner(QObject):
 
     def _process_comic_files(
         self,
-        comic_files: List[str],
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        modified_after: Optional[datetime] = None,
-        modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[re.Pattern] = None,
-    ) -> List[ComicInfo]:
+        comic_files: list[str],
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        modified_after: datetime | None = None,
+        modified_before: datetime | None = None,
+        name_filter_regex: re.Pattern | None = None,
+    ) -> list[ComicInfo]:
         """处理漫画文件，提取图片哈希"""
         comic_infos = []
         max_workers = self.config.get_max_workers()
@@ -289,7 +288,7 @@ class Scanner(QObject):
     def _persist_index(
         self,
         similar_comic_cache_dict: dict,
-        duplicate_groups: List[DuplicateGroup],
+        duplicate_groups: list[DuplicateGroup],
         similarity_threshold: int,
         min_similar_images: int,
     ):
@@ -322,12 +321,12 @@ class Scanner(QObject):
     def _process_single_comic(
         self,
         file_path: str,
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        modified_after: Optional[datetime] = None,
-        modified_before: Optional[datetime] = None,
-        name_filter_regex: Optional[re.Pattern] = None,
-    ) -> Optional[ComicInfo]:
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        modified_after: datetime | None = None,
+        modified_before: datetime | None = None,
+        name_filter_regex: re.Pattern | None = None,
+    ) -> ComicInfo | None:
         """处理单个漫画文件或文件夹
 
         Args:
@@ -470,16 +469,16 @@ class Scanner(QObject):
             logger.error(f"处理漫画失败 {file_path}: {e}")
             return None
 
-    def _detect_duplicates(self, comic_infos: List[ComicInfo]) -> List[DuplicateGroup]:
+    def _detect_duplicates(self, comic_infos: list[ComicInfo]) -> list[DuplicateGroup]:
         """检测重复漫画 - 使用numpy优化的高性能实现"""
-        duplicate_groups: List[DuplicateGroup] = []
+        duplicate_groups: list[DuplicateGroup] = []
 
         similarity_threshold = self.config.get_similarity_threshold()
         min_similar_images = self.config.get_min_similar_images()
         min_image_count, max_image_count = self.config.get_comic_image_count_range()
 
         # 过滤有效的漫画（包括图片数量范围过滤）
-        valid_comics: List[ComicInfo] = []
+        valid_comics: list[ComicInfo] = []
         filtered_count = 0
         for comic in comic_infos:
             if comic.error or not comic.image_hashes:
@@ -518,8 +517,8 @@ class Scanner(QObject):
         logger.info(f"加载了 {len(blacklist_hashes)} 个黑名单图片哈希")
 
         # 加载索引
-        similar_comic_cache_dict: Dict[str, NDArray[np.int64]] = {}
-        cached_duplicate_groups: List[CachedDuplicateGroup] = []
+        similar_comic_cache_dict: dict[str, NDArray[np.int64]] = {}
+        cached_duplicate_groups: list[CachedDuplicateGroup] = []
         try:
             with open("index.db", "rb") as f:
                 cache_data: dict = pickle.load(f)
@@ -566,7 +565,7 @@ class Scanner(QObject):
 
         for group in cached_duplicate_groups:
             # 检查组中的漫画是否仍然存在
-            valid_comics_in_group: List[ComicInfo] = []
+            valid_comics_in_group: list[ComicInfo] = []
             for cache_key in group.comic_cache_keys:
                 if cache_key in valid_comic_map:
                     # 使用当前的 comic 信息
@@ -586,7 +585,7 @@ class Scanner(QObject):
 
             # 根据相似度阈值过滤哈希对
             valid_similar_hashes = set()
-            valid_similar_hash_groups = []
+            valid_similar_hash_groups = set()
             for hash1, hash2, distance in group.similar_hash_groups:
                 if distance <= similarity_threshold:
                     # 检查哈希的漫画是否仍然存在
@@ -606,7 +605,7 @@ class Scanner(QObject):
                         continue
 
                     if len(blacklist_hashes) == 0:
-                        valid_similar_hash_groups.append((hash1, hash2, distance))
+                        valid_similar_hash_groups.add((hash1, hash2, distance))
                         continue
 
                     # 检查是否在黑名单中
@@ -627,7 +626,7 @@ class Scanner(QObject):
                     if np.all(hamming_distances > similarity_threshold):
                         valid_similar_hashes.add(hash1)
                         valid_similar_hashes.add(hash2)
-                        valid_similar_hash_groups.append((hash1, hash2, distance))
+                        valid_similar_hash_groups.add((hash1, hash2, distance))
 
             # 检查是否满足最小相似图片数量要求
             # 统计每个漫画的相似图片数量
@@ -698,7 +697,7 @@ class Scanner(QObject):
                 blacklist_mask = np.any(
                     hamming_distances <= similarity_threshold, axis=1
                 )
-                blacklist_image_count += np.sum(blacklist_mask)
+                blacklist_image_count += int(np.sum(blacklist_mask))
                 # 过滤掉黑名单图片
                 hash_array = hash_array[~blacklist_mask]
                 hash_index = hash_index[~blacklist_mask]
@@ -747,7 +746,7 @@ class Scanner(QObject):
         self.progress.start_time = time.time()
 
         # 构建漫画到重复组的字典映射
-        comic_to_group_map: Dict[ComicInfo, DuplicateGroup] = {}
+        comic_to_group_map: dict[str, DuplicateGroup] = {}
 
         # 更新字典映射
         for group in valid_cached_groups:

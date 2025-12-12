@@ -4,8 +4,6 @@
 用于显示选中漫画的图片预览
 """
 
-from typing import List, Tuple, Union
-
 import imagehash
 from loguru import logger
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -21,6 +19,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from src.utils import is_int_list, is_str_list
 from src.utils.file_utils import natural_sort_key
 
 from ..core.archive_reader import ArchiveReader
@@ -41,21 +40,23 @@ class ImageLoadThread(QThread):
     def __init__(
         self,
         comic_path: str,
-        comic_hashes: List[Tuple[str, str]],
-        image_indices_or_names: Union[List[int], List[str]],
+        comic_hashes: list[tuple[str, str]],
+        image_indices_or_names: list[int] | list[str],
         max_size: tuple,
-        load_by_name: bool = False,
     ):
         super().__init__()
         self.comic_path = comic_path
         self.comic_hashes = comic_hashes
         self.image_indices_or_names = image_indices_or_names
         self.max_size = max_size
-        self.load_by_name = load_by_name
         self._stop_requested = False
 
     def run(self):
         """运行图片加载"""
+        # 检查是否有图片需要加载
+        if not self.image_indices_or_names:
+            return
+
         try:
             archive_reader = ArchiveReader()
 
@@ -65,17 +66,26 @@ class ImageLoadThread(QThread):
                 logger.error(f"压缩包中没有图片文件: {self.comic_path}")
                 return
 
-            if self.load_by_name:
-                self._load_by_filename(archive_reader, image_files)
-            else:
-                self._load_by_index(archive_reader, image_files)
+            if is_str_list(self.image_indices_or_names):
+                self._load_by_filename(
+                    archive_reader, image_files, self.image_indices_or_names
+                )
+            elif is_int_list(self.image_indices_or_names):
+                self._load_by_index(
+                    archive_reader, image_files, self.image_indices_or_names
+                )
 
         except Exception as e:
             logger.error(f"加载漫画图片失败: {e}")
 
-    def _load_by_index(self, archive_reader, image_files):
+    def _load_by_index(
+        self,
+        archive_reader: ArchiveReader,
+        image_files: list[str],
+        image_indices: list[int],
+    ):
         """按索引加载图片"""
-        for index in self.image_indices_or_names:
+        for index in image_indices:
             if self._stop_requested:
                 break
 
@@ -115,14 +125,19 @@ class ImageLoadThread(QThread):
                 logger.error(f"加载图片 {index} 失败: {e}")
                 self.load_error.emit(index, str(e))
 
-    def _load_by_filename(self, archive_reader: ArchiveReader, image_files: List[str]):
+    def _load_by_filename(
+        self,
+        archive_reader: ArchiveReader,
+        image_files: list[str],
+        image_names: list[str],
+    ):
         """按文件名加载图片"""
         # 创建文件名到哈希的映射
         filename_to_hash = {
             filename: hash_hex for filename, hash_hex in self.comic_hashes
         }
 
-        for filename in self.image_indices_or_names:
+        for filename in image_names:
             if self._stop_requested:
                 break
 
@@ -176,16 +191,16 @@ class ImagePreviewWidget(QWidget):
         self.config = config_manager
         self.current_comic: ComicInfo | None = None
         self.current_group: DuplicateGroup | None = None
-        self.compare_comics: List[ComicInfo] = []  # 要对比的漫画列表
+        self.compare_comics: list[ComicInfo] = []  # 要对比的漫画列表
         self.image_pixmaps = {}  # {index: QPixmap} or {hash: QPixmap}
         self.load_thread = None
-        self.show_duplicates_only = True  # 新增：是否只显示重复图片
-        self.load_finished = False  # 新增：是否加载完成
+        self.show_duplicates_only = True  # 是否只显示重复图片
+        self.load_finished = False  # 是否加载完成
 
         # 分批加载相关属性
         self.batch_size = 6  # 每批加载的图片数量
         self.loaded_count = 0  # 已加载的图片数量
-        self.total_items = []  # 所有要加载的图片索引或文件名
+        self.total_items: list[int] | list[str] = []  # 所有要加载的图片索引或文件名
         self.is_loading = False  # 是否正在加载
         self.load_by_name = False  # 是否按文件名加载
 
@@ -263,7 +278,7 @@ class ImagePreviewWidget(QWidget):
         # 加载预览图片
         self.load_preview_images()
 
-    def set_compare_comics(self, comics: List[ComicInfo]):
+    def set_compare_comics(self, comics: list[ComicInfo]):
         """设置要对比的漫画列表"""
         self.compare_comics = comics
         # 如果当前有选中的漫画和组，重新加载图片
@@ -315,7 +330,7 @@ class ImagePreviewWidget(QWidget):
 
     def _prepare_duplicate_indices(self):
         """准备重复图片的文件名"""
-        if not self.current_group or not self.current_group.similar_hash_groups:
+        if not self.current_comic or not self.current_group:
             self.status_label.setText("该重复组没有相似图片")
             return
 
@@ -382,7 +397,7 @@ class ImagePreviewWidget(QWidget):
         self.total_items = []
         for filename, hash_hex in sorted_image_hashes:
             if hash_hex in target_hashes:
-                self.total_items.append(filename)
+                self.total_items.append(filename)  # pyrefly: ignore[bad-argument-type]
 
         # 设置按文件名加载
         self.load_by_name = True
@@ -390,6 +405,9 @@ class ImagePreviewWidget(QWidget):
 
     def _prepare_all_indices(self):
         """准备全部图片的索引"""
+        if not self.current_comic:
+            return
+
         total_images = len(self.current_comic.image_hashes)
 
         if total_images == 0:
@@ -403,7 +421,11 @@ class ImagePreviewWidget(QWidget):
 
     def _load_next_batch(self):
         """加载下一批图片"""
-        if self.is_loading or self.loaded_count >= len(self.total_items):
+        if (
+            not self.current_comic
+            or self.is_loading
+            or self.loaded_count >= len(self.total_items)
+        ):
             return
 
         self.is_loading = True
@@ -426,7 +448,6 @@ class ImagePreviewWidget(QWidget):
             self.current_comic.image_hashes,
             batch_items,
             preview_size,
-            self.load_by_name,
         )
 
         # 连接信号
@@ -466,6 +487,8 @@ class ImagePreviewWidget(QWidget):
 
         # 检查是否滚动到底部附近（距离底部小于100像素时开始加载）
         scrollbar = self.scroll_area.verticalScrollBar()
+        if scrollbar is None:
+            return
         if scrollbar.maximum() - value < 100 and self.loaded_count < len(
             self.total_items
         ):
@@ -668,8 +691,10 @@ class ImagePreviewWidget(QWidget):
         # 清空布局
         while self.image_layout.count():
             child = self.image_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+            if child:
+                widget = child.widget()
+                if widget:
+                    widget.deleteLater()
 
         # 清空缓存
         self.image_pixmaps.clear()
