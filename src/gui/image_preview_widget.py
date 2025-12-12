@@ -327,11 +327,16 @@ class ImagePreviewWidget(QWidget):
         # 确定要对比的漫画
         other_comics = []
         if self.compare_comics:
-            other_comics = [
-                c
-                for c in self.compare_comics
-                if c != self.current_comic and c in self.current_group.comics
+            # 检查是否有漫画不在当前重复组中
+            compare_comics_not_in_group = [
+                c for c in self.compare_comics if c not in self.current_group.comics
             ]
+            if compare_comics_not_in_group:
+                self.status_label.setText("当前漫画没有重复图片")
+                return
+
+            # 排除当前漫画
+            other_comics = [c for c in self.compare_comics if c != self.current_comic]
 
         if other_comics:
             # 使用imagehash和配置进行对比
