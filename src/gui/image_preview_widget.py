@@ -26,6 +26,7 @@ from src.utils.file_utils import natural_sort_key
 from ..core.archive_reader import ArchiveReader
 from ..core.config_manager import ConfigManager
 from ..core.scanner import ComicInfo, DuplicateGroup
+from ..utils.file_utils import format_file_size
 
 
 class ImageLoadThread(QThread):
@@ -173,9 +174,9 @@ class ImagePreviewWidget(QWidget):
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
         self.config = config_manager
-        self.current_comic = None
-        self.current_group = None
-        self.compare_comics = []  # 要对比的漫画列表
+        self.current_comic: ComicInfo | None = None
+        self.current_group: DuplicateGroup | None = None
+        self.compare_comics: List[ComicInfo] = []  # 要对比的漫画列表
         self.image_pixmaps = {}  # {index: QPixmap} or {hash: QPixmap}
         self.load_thread = None
         self.show_duplicates_only = True  # 新增：是否只显示重复图片
@@ -276,7 +277,7 @@ class ImagePreviewWidget(QWidget):
             return
 
         comic = self.current_comic
-        size_str = self._format_file_size(comic.size)
+        size_str = format_file_size(comic.size)
 
         info_text = f"大小: {size_str} | 总图片数: {len(comic.image_hashes)}"
         self.info_label.setText(info_text)
@@ -696,14 +697,3 @@ class ImagePreviewWidget(QWidget):
         """刷新预览"""
         if self.current_comic:
             self.load_preview_images()
-
-    def _format_file_size(self, size_bytes: int) -> str:
-        """格式化文件大小"""
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"

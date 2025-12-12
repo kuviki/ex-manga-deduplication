@@ -29,6 +29,7 @@ from win32com.shell import shell
 
 from ..core.config_manager import ConfigManager
 from ..core.scanner import DuplicateGroup
+from ..utils.file_utils import format_file_size
 
 
 class DuplicateListWidget(QWidget):
@@ -214,7 +215,7 @@ class DuplicateListWidget(QWidget):
                 for comic_idx, comic in enumerate(group.comics):
                     comic_item = QTreeWidgetItem(group_item)
                     comic_item.setText(0, os.path.basename(comic.path))
-                    comic_item.setText(1, self._format_file_size(comic.size))
+                    comic_item.setText(1, format_file_size(comic.size))
                     comic_item.setText(
                         2,
                         f"{len(comic.image_hashes)} ({comic_duplicate_counts[comic_idx]})",
@@ -749,14 +750,3 @@ class DuplicateListWidget(QWidget):
         # 持久化已检查的漫画路径
         self.config.set_checked_comic_paths(list(self._checked_comic_paths))
         self.config.save_config()
-
-    def _format_file_size(self, size_bytes: int) -> str:
-        """格式化文件大小"""
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        elif size_bytes < 1024 * 1024 * 1024:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-        else:
-            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"

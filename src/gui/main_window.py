@@ -42,6 +42,7 @@ from send2trash import send2trash
 from .. import __version__
 from ..core.config_manager import ConfigManager
 from ..core.scanner import ComicInfo, DuplicateGroup, Scanner, ScanProgress
+from ..utils.file_utils import format_file_size
 from .about_dialog import AboutDialog
 from .duplicate_list_widget import DuplicateListWidget
 from .image_preview_widget import ImagePreviewWidget
@@ -710,7 +711,7 @@ class MainWindow(QMainWindow):
             comic, group, duplicate_count = self._pending_comic_data
             # 更新详情信息
             info = f"文件路径: {comic.path.replace('/', '\\')}\n"
-            info += f"文件大小: {self.duplicate_list._format_file_size(comic.size)}\n"
+            info += f"文件大小: {format_file_size(comic.size)}\n"
             info += f"图片数: {len(comic.image_hashes)}\n"
             info += f"重复图片数: {duplicate_count}\n"
             info += f"修改时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(comic.mtime))}\n"
