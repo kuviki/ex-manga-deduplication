@@ -5,9 +5,6 @@
 """
 
 import os
-from typing import List
-
-from loguru import logger
 
 
 def is_supported_archive(file_path: str) -> bool:
@@ -56,23 +53,3 @@ def format_file_size(size_bytes: int) -> str:
         return f"{size_bytes / (1024 * 1024):.1f} MB"
     else:
         return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
-
-
-def natural_sort_key(filename: str) -> List:
-    """自然排序键函数
-
-    Args:
-        filename: 文件名
-
-    Returns:
-        List: 排序键
-    """
-    import re
-
-    def convert(text):
-        return int(text) if text.isdigit() else text.lower()
-
-    def alphanum_key(key):
-        return [convert(c) for c in re.split("([0-9]+)", key)]
-
-    return alphanum_key(filename)

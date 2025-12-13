@@ -6,12 +6,15 @@
 
 import os
 import zipfile
-import rarfile
-from typing import List, Dict, Generator, Tuple, Optional
 from io import BytesIO
+from typing import Dict, Generator, List, Optional, Tuple
+
+import rarfile
 from loguru import logger
+from natsort import os_sorted
 from PIL import Image
-from ..utils.file_utils import natural_sort_key, is_supported_image
+
+from ..utils.file_utils import is_supported_image
 
 
 class ArchiveReader:
@@ -41,7 +44,7 @@ class ArchiveReader:
                     file_path = os.path.join(archive_path, filename)
                     if os.path.isfile(file_path) and is_supported_image(filename):
                         image_files.append(filename)
-            
+
             # 处理压缩包
             elif archive_path.lower().endswith((".zip", ".cbz")):
                 with zipfile.ZipFile(archive_path, "r") as archive:
@@ -55,8 +58,8 @@ class ArchiveReader:
                         if is_supported_image(filename) and not filename.endswith("/"):
                             image_files.append(filename)
 
-            # 自然排序
-            image_files.sort(key=natural_sort_key)
+            # 按操作系统排序
+            image_files = os_sorted(image_files)
             return image_files
 
         except Exception as e:
@@ -81,7 +84,7 @@ class ArchiveReader:
                     with open(image_path, "rb") as f:
                         return f.read()
                 return None
-            
+
             # 处理压缩包
             elif archive_path.lower().endswith((".zip", ".cbz")):
                 with zipfile.ZipFile(archive_path, "r") as archive:
@@ -138,7 +141,7 @@ class ArchiveReader:
                             total_files += 1
                         except (OSError, IOError):
                             pass
-                
+
                 info = {
                     "path": archive_path,
                     "size": total_size,
