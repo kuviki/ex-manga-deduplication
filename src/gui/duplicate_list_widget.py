@@ -45,7 +45,7 @@ class DuplicateListWidget(QWidget):
     def __init__(self, config_manager: ConfigManager, parent=None):
         super().__init__(parent)
         self.config = config_manager
-        self.duplicate_groups = []
+        self.duplicate_groups: List[DuplicateGroup] = []
         self._checked_comic_paths = set(
             self.config.get_checked_comic_paths()
         )  # 加载已检查的漫画路径
@@ -213,9 +213,13 @@ class DuplicateListWidget(QWidget):
                 comic_duplicate_counts = []
                 for comic_idx, comic in enumerate(group.comics):
                     duplicate_count = 0
-                    comic_hash_set = set(hash[1] for hash in comic.image_hashes)
-                    # 使用集合交集计算，比逐个判断更高效
-                    duplicate_count = len(comic_hash_set & group_image_hashes)
+                    comic_hash_dict = dict(comic.image_hashes)
+                    for filename in comic.all_image_names:
+                        if (
+                            filename in comic_hash_dict
+                            and comic_hash_dict[filename] in group_image_hashes
+                        ):
+                            duplicate_count += 1
                     comic_duplicate_counts.append(duplicate_count)
 
                 # 添加漫画节点
