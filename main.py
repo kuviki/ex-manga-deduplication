@@ -7,9 +7,9 @@
 import os
 import sys
 
+from loguru import logger
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication
-from loguru import logger
 
 from src import __version__
 from src.core.config_manager import ConfigManager
@@ -72,8 +72,8 @@ def main():
         # 运行应用程序
         sys.exit(app.exec_())
 
-    except Exception as e:
-        logger.error(f"应用程序启动失败: {e}")
+    except Exception:
+        logger.exception("应用程序启动失败，详细错误信息:")
         sys.exit(1)
 
 
