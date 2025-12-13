@@ -57,6 +57,7 @@ class ComicInfo:
     path: str
     size: int
     mtime: float
+    all_image_names: list[str]  # 漫画中的所有图片文件名列表（包含被过滤的）
     image_hashes: list[tuple[str, str]]  # [(filename, hash_hex)]
     image_hash_array: NDArray[np.uint64]
     cache_key: str  # 缓存键
@@ -400,11 +401,27 @@ class Scanner(QObject):
                     and "image_hashes" in cached_info
                     and "image_hash_array" in cached_info
                 ):
+                    # 检查是否存在 all_image_names 字段，如果不存在则获取并更新缓存
+                    if "all_image_names" not in cached_info:
+                        logger.debug(
+                            f"缓存中缺少 all_image_names 字段，正在获取: {file_path}"
+                        )
+                        all_image_names = self.archive_reader.get_image_files(file_path)
+                        cached_info["all_image_names"] = all_image_names
+                        # 更新缓存
+                        self.cache_manager.set_comic_cache(
+                            file_path,
+                            mtime,
+                            self.config.get_hash_algorithm(),
+                            cached_info,
+                        )
+
                     logger.debug(f"使用缓存数据: {file_path}")
                     return ComicInfo(
                         path=file_path,
                         size=size,
                         mtime=mtime,
+                        all_image_names=cached_info["all_image_names"],
                         image_hashes=cached_info["image_hashes"],
                         image_hash_array=np.array(cached_info["image_hash_array"]),
                         cache_key=self.cache_manager.get_cache_key(
@@ -412,12 +429,17 @@ class Scanner(QObject):
                         ),
                     )
 
+            # 获取所有图片文件名（包含被过滤的）
+            all_image_names = []
+
             # 处理压缩包或文件夹
             image_hashes = []
             min_width, min_height = self.config.get_min_image_resolution()
 
             image_hash_array = []
             for filename, image_data in self.archive_reader.read_all_images(file_path):
+                all_image_names.append(filename)
+
                 # 等待暂停
                 while self.is_paused and not self.should_stop:
                     time.sleep(0.1)
@@ -453,6 +475,7 @@ class Scanner(QObject):
                 path=file_path,
                 size=size,
                 mtime=mtime,
+                all_image_names=all_image_names,
                 image_hashes=image_hashes,
                 image_hash_array=np.array(image_hash_array),
                 cache_key=self.cache_manager.get_cache_key(
@@ -461,12 +484,13 @@ class Scanner(QObject):
             )
 
             # 保存到缓存
-            if not self.should_stop and self.config.is_cache_enabled():
+            if self.config.is_cache_enabled():
                 self.cache_manager.set_comic_cache(
                     file_path,
                     mtime,
                     self.config.get_hash_algorithm(),
                     {
+                        "all_image_names": all_image_names,
                         "image_hashes": image_hashes,
                         "image_hash_array": image_hash_array,
                     },
