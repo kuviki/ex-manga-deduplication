@@ -744,7 +744,7 @@ class ImagePreviewWidget(QWidget):
             # 获取漫画查看器路径
             viewer_path = self.config.get_comic_viewer_path()
 
-            if viewer_path and os.path.exists(viewer_path):
+            if viewer_path:
                 # 使用指定的漫画查看器打开
                 self._open_with_viewer(viewer_path, index, filename)
             else:

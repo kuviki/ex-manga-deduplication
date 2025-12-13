@@ -5,10 +5,11 @@
 """
 
 import os
-import yaml
-from typing import Dict, List, Any, Optional
-from loguru import logger
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import yaml
+from loguru import logger
 
 
 class HashAlgorithm(Enum):
@@ -178,8 +179,11 @@ class ConfigManager:
         return self.get("cache_dir", "cache")
 
     def get_comic_viewer_path(self) -> str:
-        """获取漫画查看器路径"""
-        return self.get("comic_viewer_path", "")
+        """获取漫画查看器路径，如果路径不存在则返回空字符串"""
+        viewer_path = self.get("comic_viewer_path", "")
+        if viewer_path and os.path.exists(viewer_path):
+            return viewer_path
+        return ""
 
     def get_max_workers(self) -> int:
         """获取最大工作线程数"""
@@ -216,16 +220,19 @@ class ConfigManager:
 
     def get_filter_settings(self) -> Dict[str, Any]:
         """获取筛选设置"""
-        return self.get("filter_settings", {
-            "created_time_enabled": False,
-            "created_after": None,
-            "created_before": None,
-            "modified_time_enabled": False,
-            "modified_after": None,
-            "modified_before": None,
-            "name_filter_enabled": False,
-            "name_filter_regex": "",
-        })
+        return self.get(
+            "filter_settings",
+            {
+                "created_time_enabled": False,
+                "created_after": None,
+                "created_before": None,
+                "modified_time_enabled": False,
+                "modified_after": None,
+                "modified_before": None,
+                "name_filter_enabled": False,
+                "name_filter_regex": "",
+            },
+        )
 
     def set_filter_settings(self, settings: Dict[str, Any]):
         """设置筛选设置"""

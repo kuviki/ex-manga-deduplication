@@ -323,7 +323,7 @@ class DuplicateListWidget(QWidget):
         open_viewer_btn.setToolTip("用漫画查看器打开")
         open_viewer_btn.clicked.connect(lambda: self.open_with_viewer(comic.path))
         viewer_path = self.config.get_comic_viewer_path()
-        if not viewer_path or not os.path.exists(viewer_path):
+        if not viewer_path:
             open_viewer_btn.setDisabled(True)
         layout.addWidget(open_viewer_btn)
 
@@ -419,7 +419,7 @@ class DuplicateListWidget(QWidget):
         open_viewer_action = menu.addAction("用漫画查看器打开")
         open_viewer_action.triggered.connect(lambda: self.open_with_viewer(comic.path))
         viewer_path = self.config.get_comic_viewer_path()
-        if not viewer_path or not os.path.exists(viewer_path):
+        if not viewer_path:
             open_viewer_action.setDisabled(True)
 
         menu.addSeparator()
@@ -541,7 +541,7 @@ class DuplicateListWidget(QWidget):
         """用指定漫画查看器打开"""
         try:
             viewer_path = self.config.get_comic_viewer_path()
-            if viewer_path and os.path.exists(viewer_path):
+            if viewer_path:
                 subprocess.Popen([viewer_path, file_path])
             else:
                 QMessageBox.warning(self, "警告", "漫画查看器程序不存在")
