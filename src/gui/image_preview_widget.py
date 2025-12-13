@@ -4,6 +4,9 @@
 用于显示选中漫画的图片预览
 """
 
+import os
+import subprocess
+
 import imagehash
 from loguru import logger
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
@@ -13,6 +16,7 @@ from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -548,6 +552,14 @@ class ImagePreviewWidget(QWidget):
         image_label.setAlignment(Qt.AlignCenter)
         image_label.setScaledContents(False)
 
+        # 启用鼠标跟踪并设置双击事件
+        image_label.setMouseTracking(True)
+        image_label.mouseDoubleClickEvent = (
+            lambda event, idx=index, name=filename: self.on_image_double_click(
+                event, idx, name
+            )
+        )
+
         # 图片信息 （可选择复制）
         info_text = f"图片[{index + 1}]: {filename}\n哈希值: {image_hash}\n({pixmap.width()}x{pixmap.height()})"
         info_label = QLabel(info_text)
@@ -722,3 +734,76 @@ class ImagePreviewWidget(QWidget):
         """刷新预览"""
         if self.current_comic:
             self.load_preview_images()
+
+    def on_image_double_click(self, _event, index: int, filename: str):
+        """处理图片双击事件"""
+        if not self.current_comic:
+            return
+
+        try:
+            # 获取漫画查看器路径
+            viewer_path = self.config.get_comic_viewer_path()
+
+            if viewer_path and os.path.exists(viewer_path):
+                # 使用指定的漫画查看器打开
+                self._open_with_viewer(viewer_path, index, filename)
+            else:
+                # 根据漫画存储类型决定打开方式
+                if os.path.isdir(self.current_comic.path):
+                    # 文件夹形式，直接打开图片文件
+                    self._open_image_file(index, filename)
+                else:
+                    # 压缩包形式，打开压缩包文件
+                    self._open_archive_file()
+
+        except Exception as e:
+            logger.exception("打开图片失败，详细错误信息: ")
+            QMessageBox.critical(self, "错误", f"打开图片失败: {e}")
+
+    def _open_with_viewer(self, viewer_path: str, index: int, filename: str):
+        """使用指定的漫画查看器打开"""
+        if not self.current_comic:
+            return
+
+        try:
+            if os.path.isdir(self.current_comic.path):
+                # 文件夹形式，打开具体的图片文件
+                image_path = os.path.join(self.current_comic.path, filename)
+                if os.path.exists(image_path):
+                    subprocess.Popen([viewer_path, image_path])
+                else:
+                    QMessageBox.warning(self, "警告", f"图片文件不存在: {filename}")
+            else:
+                # 压缩包形式，打开压缩包文件
+                subprocess.Popen([viewer_path, self.current_comic.path])
+        except Exception as e:
+            raise Exception(f"使用漫画查看器打开失败: {e}")
+
+    def _open_image_file(self, index: int, filename: str):
+        """打开文件夹中的图片文件"""
+        if not self.current_comic:
+            return
+
+        try:
+            image_path = os.path.join(self.current_comic.path, filename)
+            if os.path.exists(image_path):
+                os.startfile(image_path)  # Windows系统默认程序打开
+            else:
+                QMessageBox.warning(self, "警告", f"图片文件不存在: {filename}")
+        except Exception as e:
+            raise Exception(f"打开图片文件失败: {e}")
+
+    def _open_archive_file(self):
+        """打开压缩包文件"""
+        if not self.current_comic:
+            return
+
+        try:
+            if os.path.exists(self.current_comic.path):
+                os.startfile(self.current_comic.path)  # Windows系统默认程序打开
+            else:
+                QMessageBox.warning(
+                    self, "警告", f"漫画文件不存在: {self.current_comic.path}"
+                )
+        except Exception as e:
+            raise Exception(f"打开压缩包失败: {e}")
