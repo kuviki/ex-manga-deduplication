@@ -57,6 +57,7 @@ class ConfigManager:
             },  # 参与去重的漫画图片数量范围，max为None表示无限制
             # 应用程序设置
             "comic_viewer_path": "",
+            "comic_viewer_args": "",
             "error_handling": ErrorHandling.SKIP.value,
             # 扫描设置
             "max_workers": 4,
@@ -184,6 +185,10 @@ class ConfigManager:
         if viewer_path and os.path.exists(viewer_path):
             return viewer_path
         return ""
+
+    def get_comic_viewer_args(self) -> str:
+        """获取漫画查看器参数"""
+        return self.get("comic_viewer_args", "")
 
     def get_max_workers(self) -> int:
         """获取最大工作线程数"""

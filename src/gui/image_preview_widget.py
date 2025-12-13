@@ -5,6 +5,7 @@
 """
 
 import os
+import shlex
 import subprocess
 
 import imagehash
@@ -679,7 +680,7 @@ class ImagePreviewWidget(QWidget):
                 # 根据漫画存储类型决定打开方式
                 if os.path.isdir(self.current_comic.path):
                     # 文件夹形式，直接打开图片文件
-                    self._open_image_file(index, filename)
+                    self._open_image_file(filename)
                 else:
                     # 压缩包形式，打开压缩包文件
                     self._open_archive_file()
@@ -688,7 +689,7 @@ class ImagePreviewWidget(QWidget):
             logger.exception("打开图片失败，详细错误信息: ")
             QMessageBox.critical(self, "错误", f"打开图片失败: {e}")
 
-    def _open_with_viewer(self, viewer_path: str, index: int, filename: str):
+    def _open_with_viewer(self, viewer_path: str, image_index: int, filename: str):
         """使用指定的漫画查看器打开"""
         if not self.current_comic:
             return
@@ -703,11 +704,27 @@ class ImagePreviewWidget(QWidget):
                     QMessageBox.warning(self, "警告", f"图片文件不存在: {filename}")
             else:
                 # 压缩包形式，打开压缩包文件
-                subprocess.Popen([viewer_path, self.current_comic.path])
+                # 获取漫画查看器参数
+                viewer_args = self.config.get_comic_viewer_args()
+
+                if viewer_args:
+                    cmd = [viewer_path]
+                    # 使用format方法替换占位符，正确处理包含空格的路径
+                    viewer_args = viewer_args.format(
+                        file=self.current_comic.path,
+                        page=image_index + 1,
+                        page_index=image_index,
+                    )
+                    # 使用shlex.split正确处理包含空格的参数
+                    cmd.extend(shlex.split(viewer_args))
+                    print(cmd)
+                    subprocess.Popen(cmd)
+                else:
+                    subprocess.Popen([viewer_path, self.current_comic.path])
         except Exception as e:
             raise Exception(f"使用漫画查看器打开失败: {e}")
 
-    def _open_image_file(self, index: int, filename: str):
+    def _open_image_file(self, filename: str):
         """打开文件夹中的图片文件"""
         if not self.current_comic:
             return

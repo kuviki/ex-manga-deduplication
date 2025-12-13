@@ -4,28 +4,28 @@
 用于配置应用程序的各种参数
 """
 
-from PyQt5.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QTabWidget,
-    QWidget,
-    QFormLayout,
-    QLabel,
-    QSpinBox,
-    QComboBox,
-    QLineEdit,
-    QPushButton,
-    QFileDialog,
-    QCheckBox,
-    QGroupBox,
-    QDialogButtonBox,
-    QMessageBox,
-    QTextEdit,
-)
 from loguru import logger
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ..core.config_manager import ConfigManager, HashAlgorithm, ErrorHandling
+from ..core.config_manager import ConfigManager, ErrorHandling, HashAlgorithm
 
 
 class SettingsDialog(QDialog):
@@ -205,6 +205,21 @@ class SettingsDialog(QDialog):
 
         external_layout.addRow("漫画查看器路径:", viewer_layout)
 
+        # 漫画查看器参数
+        args_layout = QHBoxLayout()
+        self.comic_viewer_args_edit = QLineEdit()
+        self.comic_viewer_args_edit.setPlaceholderText("可选参数，支持占位符")
+
+        # 帮助按钮
+        help_btn = QPushButton("?")
+        help_btn.setFixedSize(25, 25)
+        help_btn.setToolTip("点击查看占位符说明")
+        help_btn.clicked.connect(self.show_args_help)
+
+        args_layout.addWidget(self.comic_viewer_args_edit)
+        args_layout.addWidget(help_btn)
+        external_layout.addRow("漫画查看器参数:", args_layout)
+
         layout.addWidget(external_group)
 
         # 错误处理组
@@ -337,6 +352,7 @@ class SettingsDialog(QDialog):
 
         # 应用程序设置
         self.comic_viewer_edit.setText(self.config.get_comic_viewer_path())
+        self.comic_viewer_args_edit.setText(self.config.get_comic_viewer_args())
 
         current_error_handling = self.config.get_error_handling()
         index = self.error_handling_combo.findData(current_error_handling.value)
@@ -390,6 +406,7 @@ class SettingsDialog(QDialog):
 
             # 应用程序设置
             self.config.set("comic_viewer_path", self.comic_viewer_edit.text())
+            self.config.set("comic_viewer_args", self.comic_viewer_args_edit.text())
 
             error_handling_value = self.error_handling_combo.currentData()
             self.config.set("error_handling", error_handling_value)
@@ -470,3 +487,18 @@ class SettingsDialog(QDialog):
             ErrorHandling.ABORT: "中止扫描",
         }
         return names.get(handling, handling.value)
+
+    def show_args_help(self):
+        """显示参数帮助信息"""
+        QMessageBox.information(
+            self,
+            "参数占位符说明",
+            "支持的占位符:\n\n"
+            "{page} - 页数（从1开始）\n"
+            "{page_index} - 页数（从0开始）\n"
+            "{file} - 文件路径，需要用引号括起来\n\n"
+            "示例:\n"
+            '• 跳转到第N页: "-p {page}"\n'
+            '• 使用索引: "-page {page_index}"\n'
+            '• 组合使用: "-p {page} "{file}""',
+        )
