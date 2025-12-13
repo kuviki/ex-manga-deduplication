@@ -66,6 +66,11 @@ class ComicInfo:
     def __hash__(self) -> int:
         return hash(self.cache_key)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ComicInfo):
+            return False
+        return self.cache_key == other.cache_key
+
 
 @dataclass
 class DuplicateGroup:
