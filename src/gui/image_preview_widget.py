@@ -237,7 +237,7 @@ class ImagePreviewWidget(QWidget):
         comic = self.current_comic
         size_str = format_file_size(comic.size)
 
-        info_text = f"大小: {size_str} | 总图片数: {len(comic.all_image_names)}"
+        info_text = f"大小: {size_str} | 总图片数: {len(comic.all_image_names)} | 💡双击打开图片"
         self.info_label.setText(info_text)
 
     def load_preview_images(self):
