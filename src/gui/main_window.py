@@ -384,7 +384,7 @@ class MainWindow(QMainWindow):
 
         # 详情信息
         self.info_text = QTextEdit()
-        self.info_text.setMaximumHeight(150)
+        self.info_text.setMaximumHeight(100)
         self.info_text.setReadOnly(True)
 
         left_layout.addWidget(self.duplicate_list, 3)
