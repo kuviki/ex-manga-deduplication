@@ -118,6 +118,9 @@ class Scanner(QObject):
 
         self.progress = ScanProgress()
 
+        # 内存缓存：key为文件路径
+        self.memory_cache: dict[str, ComicInfo] = {}
+
     def scan_directory(
         self,
         directory: str,
@@ -172,6 +175,11 @@ class Scanner(QObject):
             if self.should_stop:
                 logger.info("扫描已停止")
                 return
+
+            # 保存到内存缓存
+            self.memory_cache.clear()
+            for comic_info in comic_infos:
+                self.memory_cache[comic_info.path] = comic_info
 
             # 检测重复漫画
             duplicate_groups = self._detect_duplicates(comic_infos)
@@ -378,6 +386,13 @@ class Scanner(QObject):
                     return None
                 if modified_before and modified_time > modified_before:
                     return None
+
+            # 首先检查内存缓存：如果文件修改时间没变，直接使用内存中的ComicInfo
+            if file_path in self.memory_cache:
+                cached_comic = self.memory_cache[file_path]
+                if cached_comic.mtime == mtime:
+                    logger.debug(f"使用内存缓存: {file_path}")
+                    return cached_comic
 
             # 计算大小（文件夹需要递归计算）
             if os.path.isdir(file_path):
