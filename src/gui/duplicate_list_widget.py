@@ -77,7 +77,14 @@ class DuplicateListWidget(QWidget):
         self.show_unchecked_checkbox.setChecked(self._show_only_unchecked_groups)
         self.show_unchecked_checkbox.stateChanged.connect(self._on_filter_changed)
         filter_layout.addWidget(self.show_unchecked_checkbox)
+
         filter_layout.addStretch()
+
+        # 刷新按钮
+        self.refresh_btn = QPushButton("刷新")
+        self.refresh_btn.clicked.connect(self.refresh_list)
+        filter_layout.addWidget(self.refresh_btn)
+
         layout.addLayout(filter_layout)
 
         # 树形控件
