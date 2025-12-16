@@ -537,6 +537,9 @@ class MainWindow(QMainWindow):
         self.pause_btn.setEnabled(True)
         self.stop_btn.setEnabled(True)
         self.select_dir_btn.setEnabled(False)
+        self.progress_bar.setRange(0, 0)  # 设置为不确定模式
+        self.progress_label.setText("扫描中")
+        self.status_label.setText("扫描中")
 
         # 保存筛选设置
         self.save_filter_settings()
@@ -610,6 +613,7 @@ class MainWindow(QMainWindow):
         self.select_dir_btn.setEnabled(True)
         self.pause_btn.setText("暂停")
 
+        self.progress_bar.setRange(0, 100)  # 设置为确定模式
         self.progress_bar.setValue(0)
         self.progress_label.setText("就绪")
         self.status_label.setText("就绪")
@@ -617,6 +621,7 @@ class MainWindow(QMainWindow):
     def on_progress_updated(self, progress: ScanProgress):
         """处理进度更新"""
         # 更新进度条
+        self.progress_bar.setRange(0, 100)  # 设置为确定模式
         self.progress_bar.setValue(int(progress.file_progress))
 
         # 更新Windows任务栏进度
