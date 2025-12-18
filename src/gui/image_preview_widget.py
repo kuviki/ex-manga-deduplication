@@ -711,13 +711,12 @@ class ImagePreviewWidget(QWidget):
                     cmd = [viewer_path]
                     # 使用format方法替换占位符，正确处理包含空格的路径
                     viewer_args = viewer_args.format(
-                        file=self.current_comic.path,
+                        file=f'"{self.current_comic.path}"',
                         page=image_index + 1,
                         page_index=image_index,
                     )
                     # 使用shlex.split正确处理包含空格的参数
                     cmd.extend(shlex.split(viewer_args))
-                    print(cmd)
                     subprocess.Popen(cmd)
                 else:
                     subprocess.Popen([viewer_path, self.current_comic.path])

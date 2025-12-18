@@ -538,8 +538,8 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(True)
         self.select_dir_btn.setEnabled(False)
         self.progress_bar.setRange(0, 0)  # 设置为不确定模式
-        self.progress_label.setText("扫描中")
-        self.status_label.setText("扫描中")
+        self.progress_label.setText("正在搜索漫画文件...")
+        self.status_label.setText("正在搜索漫画文件")
 
         # 保存筛选设置
         self.save_filter_settings()

@@ -496,9 +496,8 @@ class SettingsDialog(QDialog):
             "支持的占位符:\n\n"
             "{page} - 页数（从1开始）\n"
             "{page_index} - 页数（从0开始）\n"
-            "{file} - 文件路径，需要用引号括起来\n\n"
+            "{file} - 文件路径\n\n"
             "示例:\n"
-            '• 跳转到第N页: "-p {page}"\n'
-            '• 使用索引: "-page {page_index}"\n'
-            '• 组合使用: "-p {page} "{file}""',
+            '• 跳转到第N页: "-p {page} {file}"\n'
+            '• 使用索引: "-page {page_index} {file}"\n',
         )
